@@ -40,6 +40,7 @@ typedef struct TSParser TSParser;
 typedef struct TSTree TSTree;
 typedef struct TSQuery TSQuery;
 typedef struct TSQueryCursor TSQueryCursor;
+typedef struct TSNodeDiffHeap TSNodeDiffHeap;
 
 typedef enum {
   TSInputEncodingUTF8,
@@ -93,6 +94,7 @@ typedef struct {
   uint32_t context[4];
   const void *id;
   const TSTree *tree;
+  const TSNodeDiffHeap *diff_heap;
 } TSNode;
 
 typedef struct {
