@@ -888,6 +888,21 @@ TSSymbolType ts_language_symbol_type(const TSLanguage *, TSSymbol);
  */
 uint32_t ts_language_version(const TSLanguage *);
 
+/**********************/
+/* Section - DiffHeap */
+/**********************/
+
+/**
+ * Creates and initializes new TSNodeDiffHeaps for this tree.
+ */
+void ts_diff_heap_initialize(TSTree *tree, const char *code, uint32_t length);
+
+/**
+ * Compares two hashes
+ *
+ */
+bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2);
+
 #ifdef __cplusplus
 }
 #endif

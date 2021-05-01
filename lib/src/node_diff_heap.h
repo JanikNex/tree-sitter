@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "tree_sitter/api.h"
+#include "subtree.h"
 
 // A heap-allocated structure to hold additional attributes for the truediff algorithm
 //
@@ -22,6 +23,20 @@ struct TSNodeDiffHeap {
     unsigned int skip_node;
     TSNode *assigned;
 };
+
+void ts_diff_heap_calculate_structural_hash(const TSTree *tree, Subtree *subtree);
+
+void ts_diff_heap_calculate_literal_hash(const TSTree *tree, Subtree *subtree, const char *code);
+
+void ts_diff_heap_destroy(TSNodeDiffHeap *self);
+
+TSNodeDiffHeap *ts_diff_heap_new();
+
+TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree);
+
+Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
+
+TSNodeDiffHeap *ts_diff_heap_initialize_subtree(TSTreeCursor *cursor);
 
 #ifdef __cplusplus
 }

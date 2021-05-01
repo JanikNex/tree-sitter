@@ -15,3 +15,4 @@
 #include "./subtree.c"
 #include "./tree_cursor.c"
 #include "./tree.c"
+#include "./node_diff_heap.c"
