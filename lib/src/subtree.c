@@ -195,6 +195,7 @@ Subtree ts_subtree_new_leaf(
       .is_missing = false,
       .is_keyword = is_keyword,
       .is_inline = true,
+      .diff_heap = NULL,
     }};
   } else {
     SubtreeHeapData *data = ts_subtree_pool_allocate(pool);
@@ -207,6 +208,7 @@ Subtree ts_subtree_new_leaf(
       .child_count = 0,
       .symbol = symbol,
       .parse_state = parse_state,
+      .diff_heap = NULL,
       .visible = metadata.visible,
       .named = metadata.named,
       .extra = extra,
@@ -515,6 +517,7 @@ MutableSubtree ts_subtree_new_node(
     .has_changes = false,
     .fragile_left = fragile,
     .fragile_right = fragile,
+    .diff_heap = NULL,
     .is_keyword = false,
     {{
       .node_count = 0,

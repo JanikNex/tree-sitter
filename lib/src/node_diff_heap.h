@@ -14,8 +14,8 @@ extern "C" {
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
 struct TSNodeDiffHeap {
     void *id;
-    int structural_hash[32];
-    int literal_hash[32];
+    const unsigned char structural_hash[SHA256_HASH_SIZE];
+    unsigned char literal_hash[SHA256_HASH_SIZE];
     int treeheight;
     int treesize;
     void *share; //TODO: Change type to share

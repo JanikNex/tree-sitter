@@ -54,6 +54,7 @@ typedef struct {
   uint8_t padding_rows : 4;
   uint8_t lookahead_bytes : 4;
   uint16_t parse_state;
+  TSNodeDiffHeap *diff_heap;
 } SubtreeInlineData;
 
 // A heap-allocated representation of a subtree.
@@ -70,6 +71,7 @@ typedef struct {
   uint32_t child_count;
   TSSymbol symbol;
   TSStateId parse_state;
+  TSNodeDiffHeap *diff_heap;
 
   bool visible : 1;
   bool named : 1;
@@ -173,6 +175,7 @@ static inline bool ts_subtree_missing(Subtree self) { return SUBTREE_GET(self, i
 static inline bool ts_subtree_is_keyword(Subtree self) { return SUBTREE_GET(self, is_keyword); }
 static inline TSStateId ts_subtree_parse_state(Subtree self) { return SUBTREE_GET(self, parse_state); }
 static inline uint32_t ts_subtree_lookahead_bytes(Subtree self) { return SUBTREE_GET(self, lookahead_bytes); }
+static inline TSNodeDiffHeap *ts_subtree_node_diff_heap(Subtree self){ return SUBTREE_GET(self, diff_heap); }
 
 #undef SUBTREE_GET
 
@@ -193,6 +196,14 @@ static inline void ts_subtree_set_extra(MutableSubtree *self) {
   } else {
     self->ptr->extra = true;
   }
+}
+
+static inline void ts_subtree_assign_node_diff_heap(MutableSubtree *self, TSNodeDiffHeap *heap){
+    if (self->data.is_inline) {
+        self->data.diff_heap = heap;
+    } else {
+        self->ptr->diff_heap = heap;
+    }
 }
 
 static inline TSSymbol ts_subtree_leaf_symbol(Subtree self) {
