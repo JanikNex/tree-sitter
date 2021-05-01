@@ -24,7 +24,7 @@ TSNode ts_node_new(
     {position.bytes, position.extent.row, position.extent.column, alias},
     subtree,
     tree,
-    NULL
+    ts_subtree_node_diff_heap(*subtree)
   };
 }
 
