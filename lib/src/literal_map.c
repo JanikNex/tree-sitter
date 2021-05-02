@@ -1,0 +1,21 @@
+#include <string.h>
+#include "alloc.h"
+#include "literal_map.h"
+
+TSLiteralMap *ts_literal_map_create(const TSLanguage *lang) {
+  TSLiteralMap *lit_map = ts_malloc(sizeof(TSLiteralMap));
+  lit_map->symbol_count = ts_language_symbol_count(lang);
+  uint32_t map_size = (lit_map->symbol_count / 8) + 1;
+  lit_map->symbol_map = ts_malloc(map_size);
+  memset(lit_map->symbol_map, 0, map_size);
+  return lit_map;
+}
+
+void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx) {
+  self->symbol_map[idx / 8] |= 1 << (idx % 8);
+}
+
+void ts_literal_map_destroy(TSLiteralMap *self) {
+  ts_free(self->symbol_map);
+  ts_free(self);
+}

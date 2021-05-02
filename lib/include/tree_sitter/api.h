@@ -41,6 +41,7 @@ typedef struct TSTree TSTree;
 typedef struct TSQuery TSQuery;
 typedef struct TSQueryCursor TSQueryCursor;
 typedef struct TSNodeDiffHeap TSNodeDiffHeap;
+typedef struct TSLiteralMap TSLiteralMap;
 
 typedef enum {
   TSInputEncodingUTF8,
@@ -902,6 +903,14 @@ void ts_diff_heap_initialize(TSTree *tree, const char *code, uint32_t length);
  *
  */
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2);
+
+void ts_diff_heap_destroy(TSNodeDiffHeap *self);
+
+TSLiteralMap *ts_literal_map_create(const TSLanguage *lang);
+
+void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx);
+
+void ts_literal_map_destroy(TSLiteralMap *self);
 
 #ifdef __cplusplus
 }

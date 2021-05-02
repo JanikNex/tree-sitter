@@ -16,3 +16,4 @@
 #include "./tree_cursor.c"
 #include "./tree.c"
 #include "./node_diff_heap.c"
+#include "./literal_map.c"
