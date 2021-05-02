@@ -4,27 +4,18 @@
 #include "tree.h"
 #include "tree_cursor.h"
 
-void ts_diff_heap_calculate_structural_hash(const TSTree *tree, Subtree *subtree) {
+void ts_diff_heap_calculate_structural_hash(TSNode node) {
   SHA256_Context ctxt;
   if (sha256_initialize(&ctxt) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at initialize\n");
     return;
   }
-  TSSymbol symbol = ts_subtree_symbol(*subtree);
-  const char *tag = ts_language_symbol_name(tree->language, symbol);
+  const char *tag = ts_node_type(node);
   if (sha256_add_bytes(&ctxt, tag, strlen(tag)) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");
     return;
   }
-  uint32_t child_count = ts_subtree_child_count(*subtree) > 0 ? subtree->ptr->visible_child_count : 0;
-  Length position = ts_subtree_padding(tree->root);
-  TSNode node = (TSNode) {
-    {position.bytes, position.extent.row, position.extent.column, 0},
-    subtree,
-    tree,
-    ts_subtree_node_diff_heap(*subtree)
-  };
-  for (uint32_t i = 0; i < child_count; ++i) {
+  for (uint32_t i = 0; i < ts_node_child_count(node); ++i) {
     TSNode child = ts_node_child(node, i);
     if (!ts_node_is_null(child)) {
       if (sha256_add_bytes(&ctxt, child.diff_heap->structural_hash, 32) != SHA_DIGEST_OK) {
@@ -77,7 +68,9 @@ TSNodeDiffHeap *ts_diff_heap_initialize_subtree(TSTreeCursor *cursor) {
   node_diff_heap->treeheight = 1 + tree_height;
   ts_subtree_assign_node_diff_heap(&mut_subtree, node_diff_heap);
   *subtree = ts_subtree_from_mut(mut_subtree);
-  ts_diff_heap_calculate_structural_hash(cursor->tree, subtree);
+  TSNode current_node = ts_tree_cursor_current_node(cursor);
+  ts_diff_heap_calculate_structural_hash(current_node);
+  ts_diff_heap_calculate_literal_hash(current_node, code, literal_map);
   return node_diff_heap;
 }
 
