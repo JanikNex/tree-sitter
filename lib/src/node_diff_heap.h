@@ -16,7 +16,7 @@ extern "C" {
 struct TSNodeDiffHeap {
     void *id;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
-    unsigned char literal_hash[SHA256_HASH_SIZE];
+    const unsigned char literal_hash[SHA256_HASH_SIZE];
     int treeheight;
     int treesize;
     void *share; //TODO: Change type to share
@@ -26,9 +26,8 @@ struct TSNodeDiffHeap {
 
 void ts_diff_heap_calculate_structural_hash(TSNode node);
 
-void ts_diff_heap_calculate_literal_hash(const TSTree *tree, Subtree *subtree, const char *code);
-
-void ts_diff_heap_destroy(TSNodeDiffHeap *self);
+void ts_diff_heap_calculate_literal_hash(TSNode node, const char *code,
+                                         const TSLiteralMap *literal_map);
 
 TSNodeDiffHeap *ts_diff_heap_new();
 
@@ -36,7 +35,8 @@ TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree);
 
 Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
 
-TSNodeDiffHeap *ts_diff_heap_initialize_subtree(TSTreeCursor *cursor);
+TSNodeDiffHeap *
+ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map);
 
 #ifdef __cplusplus
 }
