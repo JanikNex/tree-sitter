@@ -910,6 +910,8 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *lang);
 
 void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx);
 
+void ts_literal_map_set_booleans(TSLiteralMap *self, uint16_t sym_true, uint16_t sym_false);
+
 void ts_literal_map_destroy(TSLiteralMap *self);
 
 #ifdef __cplusplus

@@ -8,6 +8,8 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *lang) {
   uint32_t map_size = (lit_map->symbol_count / 8) + 1;
   lit_map->symbol_map = ts_malloc(map_size);
   memset(lit_map->symbol_map, 0, map_size);
+  lit_map->boolean_symbols[0] = 0;
+  lit_map->boolean_symbols[1] = 0;
   return lit_map;
 }
 
@@ -18,4 +20,9 @@ void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx) {
 void ts_literal_map_destroy(TSLiteralMap *self) {
   ts_free(self->symbol_map);
   ts_free(self);
+}
+
+void ts_literal_map_set_booleans(TSLiteralMap *self, uint16_t sym_true, uint16_t sym_false) {
+  self->boolean_symbols[0] = sym_true;
+  self->boolean_symbols[1] = sym_false;
 }
