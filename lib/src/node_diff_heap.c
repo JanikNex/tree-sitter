@@ -62,7 +62,7 @@ void ts_diff_heap_calculate_literal_hash(TSNode node, const char *code, const TS
 }
 
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2) {
-  return memcmp(hash1, hash2, SHA256_HASH_SIZE);
+  return memcmp(hash1, hash2, SHA256_HASH_SIZE) == 0;
 }
 
 void ts_diff_heap_initialize(TSTree *tree, const char *code, const TSLiteralMap *literal_map) {
