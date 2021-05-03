@@ -24,7 +24,7 @@ struct TSNodeDiffHeap {
     TSNode *assigned;
 };
 
-void ts_diff_heap_calculate_structural_hash(TSNode node);
+void ts_diff_heap_calculate_structural_hash(TSNode node, const TSLiteralMap *literal_map);
 
 void ts_diff_heap_calculate_literal_hash(TSNode node, const char *code,
                                          const TSLiteralMap *literal_map);
