@@ -1,4 +1,4 @@
-#include "sha256.h"
+#include "sha_digest/sha256.h"
 #include "node_diff_heap.h"
 #include "tree.h"
 #include "tree_cursor.h"

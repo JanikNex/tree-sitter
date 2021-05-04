@@ -1,0 +1,225 @@
+This directory contains the sha256 hash implementation of
+the sha_digest package.
+
+The full package can be downloaded via git:
+
+https://userpage.physik.fu-berlin.de/~jtt/sha_digest.git
+
+or from its homepage:
+
+http://users.physik.fu-berlin.de/~jtt/sha_digest.html
+
+==============================================================
+
+
+I. Overview
+
+This package is an implementation, written in C, of the Secure
+Hashing Algorithms SHA-1, SHA-224, SHA-256, SHA-384 and SHA512
+as described in FIPS PUB 180-3, published in October 2008, to
+be downloaded from
+
+http://csrc.nist.gov/publications/fips/fips180-3/fips180-3_final.pdf
+
+You can either use the result as a library to be linked against from
+your programs, thus supplying all the above hashing algorithms, or you
+can directly use the source files implementing one or more of these
+algorithms within your programs.
+
+The implementation is written in (hopefully) standard compliant C
+(ANSI C89), thread-safe, and should work independent of the under-
+lying hardware (i.e. it should run on e.g. 32-bit systems as well
+as 64-bit or even 128-bit systems etc.) or the operating system
+used.
+
+It allows both hashing of byte- as well as bit-oriented messages,
+i.e. the number of bits that can be hashed can be arbitrary and
+is not restricted to a multiple of 8 as it's the case with many
+other implementations.
+
+
+II. Warning
+
+While I implemented the SHA algorithms as good as my abilities and
+understanding of the standard cited above allow I'm not claiming
+that the implementations are error free. Thus if you intend to use
+them, especially for use in cryptographic applications, you defi-
+nitely should review and test the code carefully yourself!
+
+
+III. Known Limitations
+
+On systems where a char has more than 8 bits (i.e. CHAR_BIT > 8)
+only the lowest 8 bits of each byte of the data passed to the
+appropriate function for hashing will be taken into account, higher
+order bits simply are discarded.
+
+Due to trying to be platform-agnostic this implementations might
+be a bit slower than those that can make assumptions about the
+availability of certain types of unsigned integers (which are
+heavily used in these algorithms) or the endianess.
+
+
+IV. Acknowledgments
+
+A lot of ideas came from the example implementation from RFC 3174
+by D. Eastlake, 3rd (Motorola) and P. Jones (Cisco Systems), see
+e.g.
+
+http://www.faqs.org/rfcs/rfc3174.html
+
+The part for dealing with 64-bit numbers on systems that lack such
+a type has directly been taken from code written by Paul Eggert,
+and which is part of the GNU Coreutils in the file 'lib/u64.h' and
+can be downloaded e.g. from
+
+http://www.gnu.org/software/coreutils/
+
+
+V. Installation
+
+While the code itself should run on all operating systems where
+a C89 compliant compiler exists, the way to create the utility
+program as well as the library may depend on the local circum-
+stances. Since my experience is mostly limited to UNIX, the
+Makefile distributed may only work on such systems. Please
+read it before you use it and change it as needed.
+
+On UNIX and UNIX-like systems simply invoking the commands
+
+make
+make install
+
+(the latter must be invoked with administrative permissions)
+should do. It compiles an example program that calculates the
+hash digest of a file passed to it via the command line (or
+input to standard input via redirection) and creates a shared
+library that can be linked to your programs.
+
+Please note: Some functions are declared 'inline' since using
+this can speed up things quite considerably. But 'inline' is
+not a keyword defined by the C89 standard. Thus 'inline' is
+defined to nothing at all when compiled with compiler flags
+that require full C89 compliance. The test for this is
+
+#if defined __STRICT_ANSI__
+#define inline
+#endif
+
+in 'sha_types.h' (very near to the start of the file). Should
+your compiler not define '__STRICT_ANSI__' when invoked for
+strict C89 compliance you will have to change that file.
+
+If you installed everything using 'make install' you can get
+rid of everything again by using 'make uninstall'!
+
+Once you have run 'make' you may want to do tests. For this
+you will need test data ('test vectors). You can obtain them
+from the NIST Cryptographic Algorithm Validation Program (CAVP).
+There are two ZIP files, one with byte-oriented messages and
+one with bit-oriented ones:
+
+http://csrc.nist.gov/groups/STM/cavp/documents/shs/shabytetestvectors.zip
+http://csrc.nist.gov/groups/STM/cavp/documents/shs/shabittestvectors.zip
+
+Alternatively, you can also download them from my page
+
+http://users.physik.fu-berlin.de/~jtt//shabytetestvectors.zip
+http://users.physik.fu-berlin.de/~jtt//shabittestvectors.zip
+
+If you want to use the test program I have been using you also
+need a not-too-old installation of Perl. Please create two
+directories called 'shabytetestvectors' and 'shabittestvectors'
+within the programs directory, e.g. using
+
+mkdir shabytetestvectors shabittestvectors
+
+then move the ZIP files into the corresponding directories and
+unpack them there. Then you can run
+
+make test
+
+Those tests can take a long time, so please be patient (even on
+not too ancient systems they can run for up to an hour)! To keep
+you from getting totally bored (or from assuming that your machine
+locked up;-) a message is output for each successful test. If a
+test fails the error message should be obviously indicating that
+something went wrong.
+
+
+VI. Using 'sha_digest'
+
+If you need one or more SHA implementations in your own code you
+can simply link against the library. From within your code you
+then only have to '#include' the file 'sha_digest.h'.
+
+But you could as well just re-use the code for one (or more) of
+the SHA algorithms directly within your code. If you e.g. just
+need an SHA-1 implementation you can copy the files 'sha1.c',
+'sha1.h' and (not to be forgotten!) 'sha_types.h' to your pro-
+ject directory and compile it into your code. From within your
+code you then only needs to '#include' the file 'sha1.h'.
+
+You will find a description of the library functions etc. as
+well as some example code in the file 'Documentation.
+
+There are also two programs that you can use to calculate the
+SHA digests of files (or data redirected to the programs),
+'sha_digest' and 'sha_bdigest'. The first one allows to cal-
+culate the hash digest for a message that consists of bytes
+(i.e. a number of bits that is a multiple of 8) and the second
+one is for hashing of arbitrary numbers of bits.
+
+'sha_digest' takes no more that one argument, the name of a
+file to hash. If called without an argument it expects its
+input from the standard input.
+
+'sha_bdigest' needs at least one argument, the number of bits
+to hash. If there's a second argument it's taken to be the
+name of a file, otherwise it reads its input from standard
+input. For obvious reason the input must contain as many
+bits as as the program was told to expect via the first
+argument.
+
+
+VII. Copying
+
+All the code is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation; either version 2 of
+the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with fsc2.  If not, see <http://www.gnu.org/licenses/>.
+
+
+VIII. Concluding remarks
+
+I don't want to repeat myself, but this is important: if you intent
+to use this code in a security critical application review and test
+the code with utmost care before using it. I can't guarantee its
+correctness. I have tested it using the test vectors supplied by
+NIST Cryptographic Algorithm Validation Program (CAVP) and (for
+byte-oriented messages) also compared results with those of other
+implementations (like the ones from the GNU coreutils) for several
+thousand files on two machines, one with a 64- and one with a 32-bit
+version of Linux. While those tests didn't show any problems you
+shouldn't consider that as proof that the implementation is doing
+the right thing in all possible cases! And, of course, a successful
+test with the test vectors from NIST does not constitute of vali-
+dation as it can be be obtained through the Cryptographic Algorithm
+Validation Program (CAVP).
+
+If you find bugs or implement improvements please don't hesitate to
+contact me (at <jt@toerring.de>).
+
+                          Best regards, Jens Toerring
+
+-- 
+  \   Jens Thoms Toerring  ________      jt@toerring.de
+   \_______________________________      http://toerring.de

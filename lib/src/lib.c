@@ -17,3 +17,4 @@
 #include "./tree.c"
 #include "./node_diff_heap.c"
 #include "./literal_map.c"
+#include "sha_digest/sha256.c"
