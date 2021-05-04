@@ -76,6 +76,7 @@ void ts_diff_heap_initialize(TSTree *tree, const char *code, const TSLiteralMap 
   // Init cursor
   TSTreeCursor cursor = ts_diff_heap_cursor_create(tree);
   ts_diff_heap_initialize_subtree(&cursor, code, literal_map);
+  ts_tree_cursor_delete(&cursor);
 }
 
 TSNodeDiffHeap *
