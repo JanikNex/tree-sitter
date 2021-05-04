@@ -895,23 +895,42 @@ uint32_t ts_language_version(const TSLanguage *);
 
 /**
  * Creates and initializes new TSNodeDiffHeaps for this tree.
+ * Memory is allocated, must be freed with ts_diff_heap_delete
  */
 void ts_diff_heap_initialize(TSTree *tree, const char *code, const TSLiteralMap *literal_map);
 
 /**
  * Compares two hashes
- *
  */
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2);
 
 void ts_diff_heap_destroy(TSNodeDiffHeap *self);
 
+/**
+ * Creates a new TSLiteralMap.
+ *
+ *  The TSLiteralMap is used to mark all literals (literal symbols) of a language.
+ *  Truediff includes literals in the calculation of the literal hash, while all
+ *  other nodes are just represented by their type in the structural hash.
+ */
 TSLiteralMap *ts_literal_map_create(const TSLanguage *lang);
 
+/**
+ * Marks a specific symbol (represented by its id) as a literal.
+ */
 void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx);
 
+/**
+ * Marks the true and false symbols as boolean_literals.
+ * Since true and false are represented by two corresponding node_types instead of a
+ * single boolean_literal type, truediff must know their ids so that both are
+ * equal in the structural hash.
+ */
 void ts_literal_map_set_booleans(TSLiteralMap *self, uint16_t sym_true, uint16_t sym_false);
 
+/**
+ * Deletes an TSLiteralMap.
+ */
 void ts_literal_map_destroy(TSLiteralMap *self);
 
 #ifdef __cplusplus
