@@ -29,6 +29,10 @@ void ts_diff_heap_calculate_structural_hash(TSNode node, const TSLiteralMap *lit
 void ts_diff_heap_calculate_literal_hash(TSNode node, const char *code,
                                          const TSLiteralMap *literal_map);
 
+void ts_diff_heap_free(TSNodeDiffHeap *self);
+
+void ts_diff_heap_delete_subtree(TSTreeCursor *cursor);
+
 TSNodeDiffHeap *ts_diff_heap_new();
 
 TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree);

@@ -119,9 +119,33 @@ TSNodeDiffHeap *ts_diff_heap_new() {
   return node_diff_heap;
 }
 
-void ts_diff_heap_destroy(TSNodeDiffHeap *self) {
+void ts_diff_heap_free(TSNodeDiffHeap *self) {
+  if (self == NULL) {
+    return;
+  }
   ts_free(self->id);
   ts_free(self);
+}
+
+void ts_diff_heap_delete_subtree(TSTreeCursor *cursor) {
+  Subtree *subtree = ts_diff_heap_cursor_get_subtree(cursor);
+  ts_diff_heap_free(ts_subtree_node_diff_heap(*subtree));
+  MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
+  if (ts_tree_cursor_goto_first_child(cursor)) {
+    ts_diff_heap_delete_subtree(cursor);
+    while (ts_tree_cursor_goto_next_sibling(cursor)) {
+      ts_diff_heap_delete_subtree(cursor);
+    }
+    ts_tree_cursor_goto_parent(cursor);
+  }
+  ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
+  *subtree = ts_subtree_from_mut(mut_subtree);
+}
+
+void ts_diff_heap_delete(TSTree *tree) {
+  TSTreeCursor cursor = ts_diff_heap_cursor_create(tree);
+  ts_diff_heap_delete_subtree(&cursor);
+  ts_tree_cursor_delete(&cursor);
 }
 
 

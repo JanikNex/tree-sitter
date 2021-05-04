@@ -904,7 +904,10 @@ void ts_diff_heap_initialize(TSTree *tree, const char *code, const TSLiteralMap 
  */
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2);
 
-void ts_diff_heap_destroy(TSNodeDiffHeap *self);
+/**
+ * Deletes all TSNodeDiffHeaps in this tree
+ */
+void ts_diff_heap_delete(TSTree *tree);
 
 /**
  * Creates a new TSLiteralMap.
