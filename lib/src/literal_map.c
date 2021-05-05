@@ -13,7 +13,7 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *lang) {
   return lit_map;
 }
 
-void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx) {
+void ts_literal_map_add_literal(const TSLiteralMap *self, uint16_t idx) {
   self->symbol_map[idx / 8] |= 1 << (idx % 8);
 }
 

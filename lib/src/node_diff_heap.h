@@ -17,29 +17,44 @@ struct TSNodeDiffHeap {
     void *id;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
     const unsigned char literal_hash[SHA256_HASH_SIZE];
-    int treeheight;
-    int treesize;
+    unsigned int treeheight;
+    unsigned int treesize;
     void *share; //TODO: Change type to share
     unsigned int skip_node;
     TSNode *assigned;
 };
 
-void ts_diff_heap_calculate_structural_hash(TSNode node, const TSLiteralMap *literal_map);
+static inline void ts_diff_heap_free(TSNodeDiffHeap *self) {
+  if (self == NULL) {
+    return;
+  }
+  ts_free(self->id);
+  ts_free(self);
+}
 
-void ts_diff_heap_calculate_literal_hash(TSNode node, const char *code,
-                                         const TSLiteralMap *literal_map);
+static inline TSNodeDiffHeap *ts_diff_heap_new() {
+  TSNodeDiffHeap *node_diff_heap = ts_malloc(sizeof(TSNodeDiffHeap));
+  node_diff_heap->id = ts_malloc(1);
+  node_diff_heap->assigned = NULL;
+  node_diff_heap->share = NULL;
+  node_diff_heap->skip_node = 0;
+  return node_diff_heap;
+}
 
-void ts_diff_heap_free(TSNodeDiffHeap *self);
+static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
+  return ts_tree_cursor_new(ts_tree_root_node(tree));
+}
 
-void ts_diff_heap_delete_subtree(TSTreeCursor *cursor);
+static void ts_diff_heap_calculate_structural_hash(const TSNode *node, const TSLiteralMap *literal_map);
 
-TSNodeDiffHeap *ts_diff_heap_new();
+static void ts_diff_heap_calculate_literal_hash(const TSNode *node, const char *code,
+                                                const TSLiteralMap *literal_map);
 
-TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree);
+static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor);
 
-Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
+static Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
 
-TSNodeDiffHeap *
+static TSNodeDiffHeap *
 ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map);
 
 #ifdef __cplusplus

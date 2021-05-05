@@ -897,7 +897,7 @@ uint32_t ts_language_version(const TSLanguage *);
  * Creates and initializes new TSNodeDiffHeaps for this tree.
  * Memory is allocated, must be freed with ts_diff_heap_delete
  */
-void ts_diff_heap_initialize(TSTree *tree, const char *code, const TSLiteralMap *literal_map);
+void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiteralMap *literal_map);
 
 /**
  * Compares two hashes
@@ -907,7 +907,7 @@ bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2
 /**
  * Deletes all TSNodeDiffHeaps in this tree
  */
-void ts_diff_heap_delete(TSTree *tree);
+void ts_diff_heap_delete(const TSTree *tree);
 
 /**
  * Creates a new TSLiteralMap.
@@ -921,7 +921,7 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *lang);
 /**
  * Marks a specific symbol (represented by its id) as a literal.
  */
-void ts_literal_map_add_literal(TSLiteralMap *self, uint16_t idx);
+void ts_literal_map_add_literal(const TSLiteralMap *self, uint16_t idx);
 
 /**
  * Marks the true and false symbols as boolean_literals.
