@@ -95,7 +95,7 @@ typedef struct {
   uint32_t context[4];
   const void *id;
   const TSTree *tree;
-  const TSNodeDiffHeap *diff_heap;
+  const TSNodeDiffHeap *diff_heap; // TODO: Should be removed when done
 } TSNode;
 
 typedef struct {

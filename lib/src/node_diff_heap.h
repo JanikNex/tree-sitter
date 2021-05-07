@@ -34,7 +34,7 @@ static inline void ts_diff_heap_free(TSNodeDiffHeap *self) {
 
 static inline TSNodeDiffHeap *ts_diff_heap_new() {
   TSNodeDiffHeap *node_diff_heap = ts_malloc(sizeof(TSNodeDiffHeap));
-  node_diff_heap->id = ts_malloc(1);
+  node_diff_heap->id = ts_malloc(1); // TODO: Is there a better way to generate URIs?
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
   node_diff_heap->skip_node = 0;
