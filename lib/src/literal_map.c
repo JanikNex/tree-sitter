@@ -21,8 +21,3 @@ void ts_literal_map_destroy(TSLiteralMap *self) {
   ts_free(self->symbol_map);
   ts_free(self);
 }
-
-void ts_literal_map_set_booleans(TSLiteralMap *self, uint16_t sym_true, uint16_t sym_false) {
-  self->boolean_symbols[0] = sym_true;
-  self->boolean_symbols[1] = sym_false;
-}

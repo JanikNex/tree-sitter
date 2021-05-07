@@ -924,14 +924,6 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *lang);
 void ts_literal_map_add_literal(const TSLiteralMap *self, uint16_t idx);
 
 /**
- * Marks the true and false symbols as boolean_literals.
- * Since true and false are represented by two corresponding node_types instead of a
- * single boolean_literal type, truediff must know their ids so that both are
- * equal in the structural hash.
- */
-void ts_literal_map_set_booleans(TSLiteralMap *self, uint16_t sym_true, uint16_t sym_false);
-
-/**
  * Deletes an TSLiteralMap.
  */
 void ts_literal_map_destroy(TSLiteralMap *self);

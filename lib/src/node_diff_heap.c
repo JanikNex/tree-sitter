@@ -4,19 +4,13 @@
 #include "tree_cursor.h"
 #include "literal_map.h"
 
-static void ts_diff_heap_calculate_structural_hash(const TSNode *node, const TSLiteralMap *literal_map) {
+static void ts_diff_heap_calculate_structural_hash(const TSNode *node) {
   SHA256_Context ctxt;
   if (sha256_initialize(&ctxt) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at initialize\n");
     return;
   }
-  TSSymbol symbol = ts_node_symbol(*node);
-  const char *tag;
-  if (ts_literal_map_is_bool(literal_map, symbol)) {
-    tag = "boolean_literal\0";
-  } else {
-    tag = ts_node_type(*node);
-  }
+  const char *tag = ts_node_type(*node);
   if (sha256_add_bytes(&ctxt, tag, strlen(tag)) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");
     return;
@@ -74,7 +68,7 @@ bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2
 }
 
 void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiteralMap *literal_map) {
-  printf("Init Tree %p with %p\n", tree, code);
+  //printf("Init Tree %p with %p\n", tree, code);
   // Init cursor
   TSTreeCursor cursor = ts_diff_heap_cursor_create(tree);
   ts_diff_heap_initialize_subtree(&cursor, code, literal_map);
@@ -106,7 +100,7 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TS
   *subtree = ts_subtree_from_mut(mut_subtree);
   TSNode current_node = ts_tree_cursor_current_node(cursor);
   // printf("Init Nodetype %s (%s)\n", ts_node_type(current_node), ts_node_is_named(current_node) ? "NAMED" : "NOT NAMED");
-  ts_diff_heap_calculate_structural_hash(&current_node, literal_map);
+  ts_diff_heap_calculate_structural_hash(&current_node);
   ts_diff_heap_calculate_literal_hash(&current_node, code, literal_map);
   return node_diff_heap;
 }

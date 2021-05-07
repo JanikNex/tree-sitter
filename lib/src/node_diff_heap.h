@@ -45,7 +45,7 @@ static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
   return ts_tree_cursor_new(ts_tree_root_node(tree));
 }
 
-static void ts_diff_heap_calculate_structural_hash(const TSNode *node, const TSLiteralMap *literal_map);
+static void ts_diff_heap_calculate_structural_hash(const TSNode *node);
 
 static void ts_diff_heap_calculate_literal_hash(const TSNode *node, const char *code,
                                                 const TSLiteralMap *literal_map);
