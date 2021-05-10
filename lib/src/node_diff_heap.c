@@ -2,73 +2,12 @@
 #include "node_diff_heap.h"
 #include "tree.h"
 #include "tree_cursor.h"
-#include "literal_map.h"
-
-static void ts_diff_heap_calculate_structural_hash(const TSNode *node) {
-  SHA256_Context ctxt;
-  if (sha256_initialize(&ctxt) != SHA_DIGEST_OK) {
-    fprintf(stderr, "SHA_digest library failure at initialize\n");
-    return;
-  }
-  const char *tag = ts_node_type(*node);
-  if (sha256_add_bytes(&ctxt, tag, strlen(tag)) != SHA_DIGEST_OK) {
-    fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");
-    return;
-  }
-  for (uint32_t i = 0; i < ts_node_child_count(*node); ++i) {
-    TSNode child = ts_node_child(*node, i);
-    if (!ts_node_is_null(child)) {
-      if (sha256_add_bytes(&ctxt, child.diff_heap->structural_hash, 32) != SHA_DIGEST_OK) {
-        fprintf(stderr, "SHA_digest library failure at add_bytes of child\n");
-        return;
-      }
-    }
-  }
-  const TSNodeDiffHeap *node_diff_heap = node->diff_heap;
-  if (sha256_calculate(&ctxt, (unsigned char *) &(node_diff_heap->structural_hash)) != SHA_DIGEST_OK) {
-    fprintf(stderr, "SHA_digest library failure at calculate\n");
-    return;
-  }
-}
-
-static void ts_diff_heap_calculate_literal_hash(const TSNode *node, const char *code, const TSLiteralMap *literal_map) {
-  SHA256_Context ctxt;
-  if (sha256_initialize(&ctxt) != SHA_DIGEST_OK) {
-    fprintf(stderr, "SHA_digest library failure at initialize\n");
-    return;
-  }
-  TSSymbol symbol = ts_node_symbol(*node);
-  if (ts_literal_map_is_literal(literal_map, symbol)) {
-    size_t literal_len = ts_node_end_byte(*node) - ts_node_start_byte(*node);
-    //printf("Found literal @%p (+%d) of size %d\n", ((const void *) code) + ts_node_start_byte(node),
-    //ts_node_start_byte(node), literal_len);
-    if (sha256_add_bytes(&ctxt, ((const void *) code) + ts_node_start_byte(*node), literal_len) != SHA_DIGEST_OK) {
-      fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");
-      return;
-    }
-  }
-  for (uint32_t i = 0; i < ts_node_child_count(*node); ++i) {
-    TSNode child = ts_node_child(*node, i);
-    if (!ts_node_is_null(child)) {
-      if (sha256_add_bytes(&ctxt, child.diff_heap->literal_hash, 32) != SHA_DIGEST_OK) {
-        fprintf(stderr, "SHA_digest library failure at add_bytes of child\n");
-        return;
-      }
-    }
-  }
-  const TSNodeDiffHeap *node_diff_heap = node->diff_heap;
-  if (sha256_calculate(&ctxt, (unsigned char *) &(node_diff_heap->literal_hash)) != SHA_DIGEST_OK) {
-    fprintf(stderr, "SHA_digest library failure at calculate\n");
-    return;
-  }
-}
 
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2) {
   return memcmp(hash1, hash2, SHA256_HASH_SIZE) == 0;
 }
 
 void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiteralMap *literal_map) {
-  //printf("Init Tree %p with %p\n", tree, code);
   // Init cursor
   TSTreeCursor cursor = ts_diff_heap_cursor_create(tree);
   ts_diff_heap_initialize_subtree(&cursor, code, literal_map);
@@ -77,9 +16,13 @@ void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiter
 
 static TSNodeDiffHeap *
 ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map) {
-  Subtree *subtree = ts_diff_heap_cursor_get_subtree(cursor);
+  TSNode node = ts_tree_cursor_current_node(cursor);
+  Subtree *subtree = (Subtree *) node.id;
   MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
   TSNodeDiffHeap *node_diff_heap = ts_diff_heap_new();
+  SHA256_Context structural_context;
+  SHA256_Context literal_context;
+  ts_diff_heap_hash_init(&structural_context, &literal_context, &node, literal_map, code);
   unsigned int tree_height = 0;
   unsigned int tree_size = 0;
   TSNodeDiffHeap *child_heap;
@@ -87,21 +30,20 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TS
     child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
     tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;
     tree_size += child_heap->treesize;
+    ts_diff_heap_hash_child(&structural_context, &literal_context, child_heap);
     while (ts_tree_cursor_goto_next_sibling(cursor)) {
       child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
       tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;
       tree_size += child_heap->treesize;
+      ts_diff_heap_hash_child(&structural_context, &literal_context, child_heap);
     }
     ts_tree_cursor_goto_parent(cursor);
   }
   node_diff_heap->treesize = 1 + tree_size;
   node_diff_heap->treeheight = 1 + tree_height;
+  ts_diff_heap_hash_finalize(&structural_context, &literal_context, node_diff_heap);
   ts_subtree_assign_node_diff_heap(&mut_subtree, node_diff_heap);
   *subtree = ts_subtree_from_mut(mut_subtree);
-  TSNode current_node = ts_tree_cursor_current_node(cursor);
-  // printf("Init Nodetype %s (%s)\n", ts_node_type(current_node), ts_node_is_named(current_node) ? "NAMED" : "NOT NAMED");
-  ts_diff_heap_calculate_structural_hash(&current_node);
-  ts_diff_heap_calculate_literal_hash(&current_node, code, literal_map);
   return node_diff_heap;
 }
 
