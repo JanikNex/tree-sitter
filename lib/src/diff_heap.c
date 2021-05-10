@@ -1,5 +1,5 @@
 #include "sha_digest/sha256.h"
-#include "node_diff_heap.h"
+#include "diff_heap.h"
 #include "tree.h"
 #include "tree_cursor.h"
 
@@ -14,18 +14,18 @@ void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiter
   ts_tree_cursor_delete(&cursor);
 }
 
-static TSNodeDiffHeap *
+static TSDiffHeap *
 ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map) {
   TSNode node = ts_tree_cursor_current_node(cursor);
   Subtree *subtree = (Subtree *) node.id;
   MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
-  TSNodeDiffHeap *node_diff_heap = ts_diff_heap_new();
+  TSDiffHeap *node_diff_heap = ts_diff_heap_new();
   SHA256_Context structural_context;
   SHA256_Context literal_context;
   ts_diff_heap_hash_init(&structural_context, &literal_context, &node, literal_map, code);
   unsigned int tree_height = 0;
   unsigned int tree_size = 0;
-  TSNodeDiffHeap *child_heap;
+  TSDiffHeap *child_heap;
   if (ts_tree_cursor_goto_first_child(cursor)) {
     child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
     tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;

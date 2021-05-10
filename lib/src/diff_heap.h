@@ -1,5 +1,5 @@
-#ifndef TREE_SITTER_NODE_DIFF_HEAP_H
-#define TREE_SITTER_NODE_DIFF_HEAP_H
+#ifndef TREE_SITTER_DIFF_HEAP_H
+#define TREE_SITTER_DIFF_HEAP_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,7 +14,7 @@ extern "C" {
 // When using the truediff algorithm, every node is assigned an additional DiffHeap,
 // that holds any additional data that is only needed by truediff. Thereby the size
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
-struct TSNodeDiffHeap {
+struct TSDiffHeap {
     void *id;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
     const unsigned char literal_hash[SHA256_HASH_SIZE];
@@ -25,7 +25,7 @@ struct TSNodeDiffHeap {
     TSNode *assigned;
 };
 
-static inline void ts_diff_heap_free(TSNodeDiffHeap *self) {
+static inline void ts_diff_heap_free(TSDiffHeap *self) {
   if (self == NULL) {
     return;
   }
@@ -33,8 +33,8 @@ static inline void ts_diff_heap_free(TSNodeDiffHeap *self) {
   ts_free(self);
 }
 
-static inline TSNodeDiffHeap *ts_diff_heap_new() {
-  TSNodeDiffHeap *node_diff_heap = ts_malloc(sizeof(TSNodeDiffHeap));
+static inline TSDiffHeap *ts_diff_heap_new() {
+  TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = ts_malloc(1); // TODO: Is there a better way to generate URIs?
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
@@ -74,7 +74,7 @@ ts_diff_heap_hash_init(SHA256_Context *structural_context, SHA256_Context *liter
 
 static inline void
 ts_diff_heap_hash_child(SHA256_Context *structural_context, SHA256_Context *literal_context,
-                        const TSNodeDiffHeap *child_heap) {
+                        const TSDiffHeap *child_heap) {
   if (sha256_add_bytes(structural_context, child_heap->structural_hash, 32) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at add_bytes of child\n");
     return;
@@ -87,7 +87,7 @@ ts_diff_heap_hash_child(SHA256_Context *structural_context, SHA256_Context *lite
 
 static inline void
 ts_diff_heap_hash_finalize(SHA256_Context *structural_context, SHA256_Context *literal_context,
-                           const TSNodeDiffHeap *diff_heap) {
+                           const TSDiffHeap *diff_heap) {
   if (sha256_calculate(structural_context, (unsigned char *) &(diff_heap->structural_hash)) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at calculate\n");
     return;
@@ -106,11 +106,11 @@ static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor);
 
 static Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
 
-static TSNodeDiffHeap *
+static TSDiffHeap *
 ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //TREE_SITTER_NODE_DIFF_HEAP_H
+#endif //TREE_SITTER_DIFF_HEAP_H

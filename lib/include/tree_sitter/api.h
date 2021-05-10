@@ -40,7 +40,7 @@ typedef struct TSParser TSParser;
 typedef struct TSTree TSTree;
 typedef struct TSQuery TSQuery;
 typedef struct TSQueryCursor TSQueryCursor;
-typedef struct TSNodeDiffHeap TSNodeDiffHeap;
+typedef struct TSDiffHeap TSDiffHeap;
 typedef struct TSLiteralMap TSLiteralMap;
 
 typedef enum {
@@ -95,7 +95,7 @@ typedef struct {
   uint32_t context[4];
   const void *id;
   const TSTree *tree;
-  const TSNodeDiffHeap *diff_heap; // TODO: Should be removed when done
+  const TSDiffHeap *diff_heap; // TODO: Should be removed when done
 } TSNode;
 
 typedef struct {
