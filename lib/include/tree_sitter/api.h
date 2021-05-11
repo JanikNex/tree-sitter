@@ -928,6 +928,8 @@ void ts_literal_map_add_literal(const TSLiteralMap *self, uint16_t idx);
  */
 void ts_literal_map_destroy(TSLiteralMap *self);
 
+void ts_compare_to(TSNode self, TSNode other);
+
 #ifdef __cplusplus
 }
 #endif

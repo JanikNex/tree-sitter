@@ -6,8 +6,11 @@ extern "C" {
 #endif
 
 #include "tree_sitter/api.h"
+#include "sha_digest/sha256.h"
 #include "subtree.h"
 #include "literal_map.h"
+#include "tree_cursor.h"
+#include "subtree_registry.h"
 
 // A heap-allocated structure to hold additional attributes for the truediff algorithm
 //
@@ -20,9 +23,10 @@ struct TSDiffHeap {
     const unsigned char literal_hash[SHA256_HASH_SIZE];
     unsigned int treeheight;
     unsigned int treesize;
-    void *share; //TODO: Change type to share
+    SubtreeShare *share;
     unsigned int skip_node;
-    TSNode *assigned;
+    Subtree *assigned;
+    Length position;
 };
 
 static inline void ts_diff_heap_free(TSDiffHeap *self) {
@@ -33,12 +37,13 @@ static inline void ts_diff_heap_free(TSDiffHeap *self) {
   ts_free(self);
 }
 
-static inline TSDiffHeap *ts_diff_heap_new() {
+static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = ts_malloc(1); // TODO: Is there a better way to generate URIs?
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
   node_diff_heap->skip_node = 0;
+  node_diff_heap->position = pos;
   return node_diff_heap;
 }
 
@@ -98,16 +103,82 @@ ts_diff_heap_hash_finalize(SHA256_Context *structural_context, SHA256_Context *l
   }
 }
 
+static inline Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor) {
+  const TreeCursor *self = (const TreeCursor *) cursor;
+  TreeCursorEntry *last_entry = array_back(&self->stack);
+  return (Subtree *) last_entry->subtree;
+}
+
+static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *registry) {
+  TSTreeCursor cursor = ts_tree_cursor_new(node);
+  int lvl = 0;
+  Subtree *subtree;
+  do {
+    subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+    ts_subtree_registry_assign_share(registry, subtree);
+    while (ts_tree_cursor_goto_first_child(&cursor)) {
+      lvl++;
+      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+      ts_subtree_registry_assign_share(registry, subtree);
+    }
+    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+      lvl--;
+      ts_tree_cursor_goto_parent(&cursor);
+    }
+  } while (lvl > 0);
+  ts_tree_cursor_delete(&cursor);
+}
+
+static inline void foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
+  const TSDiffHeap *diff_heap = node.diff_heap;
+  if (!diff_heap->skip_node) {
+    Subtree *subtree = (Subtree *) node.id;
+    ts_subtree_registry_assign_share(registry, subtree);
+  }
+  foreach_subtree_assign_share(node, registry);
+};
+
+static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
+  TSTreeCursor cursor = ts_tree_cursor_new(node);
+  int lvl = 0;
+  Subtree *subtree;
+  do {
+    subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+    while (ts_tree_cursor_goto_first_child(&cursor)) {
+      lvl++;
+      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+    }
+    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+      lvl--;
+      ts_tree_cursor_goto_parent(&cursor);
+    }
+  } while (lvl > 0);
+  ts_tree_cursor_delete(&cursor);
+}
+
+static inline void foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
+  const TSDiffHeap *diff_heap = node.diff_heap;
+  if (!diff_heap->skip_node) {
+    Subtree *subtree = (Subtree *) node.id;
+    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+  }
+  foreach_subtree_assign_share_and_register_tree(node, registry);
+};
+
 static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
   return ts_tree_cursor_new(ts_tree_root_node(tree));
 }
 
-static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor);
+static inline void
+assign_tree(Subtree *this_subtree, Subtree *that_subtree, TSDiffHeap *this_diff_heap, TSDiffHeap *that_diff_heap) {
+  this_diff_heap->assigned = that_subtree;
+  that_diff_heap->assigned = this_subtree;
+  this_diff_heap->share = NULL;
+}
 
-static Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor);
-
-static TSDiffHeap *
-ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code, const TSLiteralMap *literal_map);
+TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree);
 
 #ifdef __cplusplus
 }
