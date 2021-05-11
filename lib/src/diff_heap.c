@@ -89,12 +89,13 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
   if (this_share == that_share) {
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
   } else {
-    if (ts_node_symbol(this_node) == ts_node_symbol(that_node)) {
+    uint32_t this_child_count = ts_node_child_count(this_node);
+    uint32_t that_child_count = ts_node_child_count(that_node);
+    //TODO: Is it correct to test for equal child count?
+    if (ts_node_symbol(this_node) == ts_node_symbol(that_node) && this_child_count == that_child_count) {
       ts_subtree_share_register_available_tree(this_share, this_subtree);
-      uint32_t this_child_count = ts_node_child_count(this_node);
-      uint32_t that_child_count = ts_node_child_count(that_node);
       uint32_t min_subtrees = this_child_count < that_child_count ? this_child_count : that_child_count;
-      for (uint32_t i = 0; i < min_subtrees; ++i) {
+      for (uint32_t i = 0; i < min_subtrees; i++) {
         TSNode this_child = ts_node_child(this_node, i);
         TSNode that_child = ts_node_child(that_node, i);
         assign_shares(this_child, that_child, registry);

@@ -21,7 +21,6 @@ SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *self, Subt
   }
 
   diff_heap->assigned = NULL;
-  printf("Assign share for %p\n", diff_heap->id);
   SubtreeShare *result = raxFind(self->subtrees, (unsigned char *) &diff_heap->structural_hash,
                                  sizeof(diff_heap->structural_hash));
   if (result == raxNotFound) {
