@@ -1,6 +1,10 @@
 #include "subtree_share.h"
 #include "diff_heap.h"
 
+typedef struct {
+    Subtree *subtree;
+} HashmapResult;
+
 static void foreach_subtree(TSNode node, SubtreeRegistry *registry, void (*f)(TSNode, SubtreeRegistry *)) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
   int lvl = 0;
@@ -73,7 +77,7 @@ rax *ts_subtree_share_preferred_trees(SubtreeShare *self) {
 }
 
 static int iterator_first_element(void *const context, void *const value) {
-  *(void **) context = value;
+  *(HashmapResult *) context = ((HashmapResult) {.subtree=value});
   return 0;
 }
 
@@ -124,8 +128,9 @@ ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool prefe
       res = NULL;
     }
   } else {
-    Subtree *iter_res;
-    res = hashmap_iterate(self->available_trees, iterator_first_element, iter_res) == 0 ? iter_res : NULL;
+    HashmapResult iter_res = (HashmapResult) {.subtree=NULL};
+    int iter_stat = hashmap_iterate(self->available_trees, iterator_first_element, &iter_res);
+    res = iter_stat == 1 ? iter_res.subtree : NULL;
   }
   if (res == NULL) {
     return res;
