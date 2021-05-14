@@ -17,5 +17,6 @@
 #include "./tree.c"
 #include "./diff_heap.c"
 #include "./literal_map.c"
+#include "./pqueue.c"
 #include "sha_digest/sha256.c"
 #include "rax/rax.c"
