@@ -2,6 +2,7 @@
 #include "diff_heap.h"
 #include "tree.h"
 #include "subtree_share.h"
+#include "pqueue.h"
 
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2) {
   return memcmp(hash1, hash2, SHA256_HASH_SIZE) == 0;
@@ -118,10 +119,69 @@ TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
   };
 }
 
+void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
+  PriorityQueue *queue = priority_queue_create();
+  priority_queue_insert(queue, (Subtree *) that_node.id);
+  while (!priority_queue_is_empty(queue)) {
+    unsigned lvl = priority_queue_head_value(queue);
+    NodeEntryArray next_nodes = array_new();
+    while (!priority_queue_is_empty(queue) && priority_queue_head_value(queue) == lvl) {
+      Subtree *next = priority_queue_pop(queue);
+      TSDiffHeap *next_diff_heap = ts_subtree_node_diff_heap(*next);
+      if (next_diff_heap->assigned == NULL) {
+        array_push(&next_nodes, ((NodeEntry) {.subtree=next, .valid=true}));
+      }
+    }
+    select_available_tree(&next_nodes, that_node.tree, true, registry);
+    select_available_tree(&next_nodes, that_node.tree, false, registry);
+    while (next_nodes.size) {
+      NodeEntry entry = array_pop(&next_nodes);
+      if (!entry.valid) {
+        continue;
+      }
+      TSNode next_node = ts_diff_heap_node(entry.subtree, that_node.tree);
+      for (uint32_t i = 0; i < ts_node_child_count(next_node); i++) {
+        TSNode child_node = ts_node_child(next_node, i);
+        Subtree *child_subtree = (Subtree *) child_node.id;
+        priority_queue_insert(queue, child_subtree);
+      }
+    }
+    array_delete((VoidArray *) &next_nodes);
+  }
+}
+
+void
+select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool preferred, SubtreeRegistry *registry) {
+  for (uint32_t i = 0; i < nodes->size; i++) {
+    NodeEntry *entry = array_get(nodes, i);
+    if (!entry->valid) { // TODO: sort by validity to speed up iterations
+      continue;
+    }
+    Subtree *subtree = entry->subtree;
+    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+    if (diff_heap->skip_node) {
+      continue;
+    } else if (diff_heap->assigned != NULL) {
+      entry->valid = false;
+    } else {
+      SubtreeShare *node_share = diff_heap->share;
+      TSNode subtree_node = ts_diff_heap_node(subtree, tree);
+      Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree_node, preferred, registry);
+      if (available_tree != NULL) {
+        TSDiffHeap *available_diff_heap = ts_subtree_node_diff_heap(*available_tree);
+        assign_tree(available_tree, subtree, available_diff_heap, diff_heap);
+        entry->valid = false;
+      }
+    }
+  }
+}
+
 
 void ts_compare_to(TSNode self, TSNode other) { //TODO: Cleanup -> free used memory
   printf("Create SubtreeRegistry\n");
   SubtreeRegistry *registry = ts_subtree_registry_create();
   printf("AssignShares\n");
   assign_shares(self, other, registry);
+  printf("AssignSubtrees\n");
+  assign_subtrees(other, registry);
 }
