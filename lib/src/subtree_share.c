@@ -28,52 +28,11 @@ static void foreach_subtree(TSNode node, SubtreeRegistry *registry, void (*f)(TS
   ts_tree_cursor_delete(&cursor);
 }
 
-
-SubtreeShare *ts_subtree_share_create() {
-  SubtreeShare *share = ts_malloc(sizeof(SubtreeShare));
-  share->available_trees = ts_malloc(sizeof(struct hashmap_s));
-  if (0 != hashmap_create(2, share->available_trees)) {
-    return NULL;
-  }
-  share->_preferred_trees = NULL;
-  return share;
-}
-
-void ts_subtree_share_delete(SubtreeShare *self) {
-  hashmap_destroy(self->available_trees);
-  ts_free(self->available_trees);
-  if (self->_preferred_trees != NULL) {
-    raxFree(self->_preferred_trees);
-  }
-  ts_free(self);
-}
-
-void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree *subtree) {
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (!diff_heap->skip_node) {
-    hashmap_put(self->available_trees, diff_heap->id, sizeof(diff_heap->id), subtree);
-    if (self->_preferred_trees != NULL) {
-      raxInsert(self->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
-                subtree, NULL);
-    }
-  }
-}
-
 static int iterator_preferred_trees_init(void *const context, void *const value) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*(Subtree *) value);
   rax *pref_trees = (rax *) context;
   raxInsert(pref_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash), value, NULL);
   return 1;
-}
-
-rax *ts_subtree_share_preferred_trees(SubtreeShare *self) {
-  if (self->_preferred_trees == NULL) {
-    self->_preferred_trees = raxNew();
-    if (hashmap_iterate(self->available_trees, iterator_preferred_trees_init, self->_preferred_trees) != 0) {
-      printf("Error on init of preferred_trees");
-    }
-  }
-  return self->_preferred_trees;
 }
 
 static int iterator_first_element(void *const context, void *const value) {
@@ -113,6 +72,48 @@ static Subtree *take_tree(const SubtreeShare *self, TSNode tree, TSNode that, Su
 
   foreach_subtree(that, registry, take_tree_assign_foreach);
   return (Subtree *) tree.id;
+}
+
+
+SubtreeShare *ts_subtree_share_create() {
+  SubtreeShare *share = ts_malloc(sizeof(SubtreeShare));
+  share->available_trees = ts_malloc(sizeof(struct hashmap_s));
+  if (0 != hashmap_create(2, share->available_trees)) {
+    return NULL;
+  }
+  share->_preferred_trees = NULL;
+  return share;
+}
+
+void ts_subtree_share_delete(SubtreeShare *self) {
+  hashmap_destroy(self->available_trees);
+  ts_free(self->available_trees);
+  if (self->_preferred_trees != NULL) {
+    raxFree(self->_preferred_trees);
+  }
+  ts_free(self);
+}
+
+void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree *subtree) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  if (!diff_heap->skip_node) {
+    hashmap_put(self->available_trees, diff_heap->id, sizeof(diff_heap->id), subtree);
+    if (self->_preferred_trees != NULL) {
+      raxInsert(self->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
+                subtree, NULL);
+    }
+  }
+}
+
+
+rax *ts_subtree_share_preferred_trees(SubtreeShare *self) {
+  if (self->_preferred_trees == NULL) {
+    self->_preferred_trees = raxNew();
+    if (hashmap_iterate(self->available_trees, iterator_preferred_trees_init, self->_preferred_trees) != 0) {
+      printf("Error on init of preferred_trees");
+    }
+  }
+  return self->_preferred_trees;
 }
 
 Subtree *

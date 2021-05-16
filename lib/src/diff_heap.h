@@ -36,6 +36,15 @@ typedef struct {
 
 typedef Array(NodeEntry) NodeEntryArray;
 
+TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
+
+void assign_shares(TSNode, TSNode, SubtreeRegistry *);
+
+void assign_subtrees(TSNode, SubtreeRegistry *);
+
+void
+select_available_tree(NodeEntryArray *, const TSTree *, bool, SubtreeRegistry *);
+
 static inline void ts_diff_heap_free(TSDiffHeap *self) {
   if (self == NULL) {
     return;
@@ -184,15 +193,6 @@ assign_tree(Subtree *this_subtree, Subtree *that_subtree, TSDiffHeap *this_diff_
   that_diff_heap->assigned = this_subtree;
   this_diff_heap->share = NULL;
 }
-
-TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree);
-
-void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry);
-
-void assign_subtrees(TSNode that_node, SubtreeRegistry *registry);
-
-void
-select_available_tree(NodeEntryArray *nodes, const TSTree *tree, bool preferred, SubtreeRegistry *registry);
 
 #ifdef __cplusplus
 }

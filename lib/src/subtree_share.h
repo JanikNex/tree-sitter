@@ -9,16 +9,15 @@
 
 SubtreeShare *ts_subtree_share_create();
 
-void ts_subtree_share_delete(SubtreeShare *self);
+void ts_subtree_share_delete(SubtreeShare *);
 
-void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree *subtree);
+void ts_subtree_share_register_available_tree(const SubtreeShare *, Subtree *);
 
-rax *ts_subtree_share_preferred_trees(SubtreeShare *self);
+rax *ts_subtree_share_preferred_trees(SubtreeShare *);
 
-Subtree *
-ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool preferred, SubtreeRegistry *registry);
+Subtree *ts_subtree_share_take_available_tree(SubtreeShare *, TSNode, bool, SubtreeRegistry *);
 
-void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *registry);
+void ts_subtree_share_deregister_available_tree(TSNode, SubtreeRegistry *);
 
 
 #endif //TREE_SITTER_SUBTREE_SHARE_H
