@@ -144,9 +144,7 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
   TSDiffHeap *diff_heap = (TSDiffHeap *) node.diff_heap;
   if (diff_heap->share != NULL) {
     SubtreeShare *share = diff_heap->share;
-    if (0 != hashmap_remove(share->available_trees, diff_heap->id, sizeof(diff_heap->id))) {
-      printf("DeregisterAvailableTree - Could not remove from hashmap\n");
-    }
+    hashmap_remove(share->available_trees, diff_heap->id, sizeof(diff_heap->id));
     share = NULL;
     deregister_foreach_subtree(node, registry);
   } else if (diff_heap->assigned != NULL) {
