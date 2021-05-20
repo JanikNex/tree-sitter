@@ -124,7 +124,7 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
   priority_queue_insert(queue, (Subtree *) that_node.id);
   while (!priority_queue_is_empty(queue)) {
     unsigned lvl = priority_queue_head_value(queue);
-    NodeEntryArray next_nodes = array_new();
+    NodeEntryArray next_nodes = array_new(); // TODO: Can we move this out of the loop?
     while (!priority_queue_is_empty(queue) && priority_queue_head_value(queue) == lvl) {
       Subtree *next = priority_queue_pop(queue);
       TSDiffHeap *next_diff_heap = ts_subtree_node_diff_heap(*next);

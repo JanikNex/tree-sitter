@@ -930,6 +930,8 @@ void ts_literal_map_destroy(TSLiteralMap *);
 
 void ts_compare_to(TSNode, TSNode);
 
+void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
+
 #ifdef __cplusplus
 }
 #endif
