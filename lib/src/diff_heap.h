@@ -11,6 +11,7 @@ extern "C" {
 #include "literal_map.h"
 #include "tree_cursor.h"
 #include "subtree_registry.h"
+#include "edit_script_buffer.h"
 
 // A heap-allocated structure to hold additional attributes for the truediff algorithm
 //
@@ -41,6 +42,16 @@ TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
 void assign_shares(TSNode, TSNode, SubtreeRegistry *);
 
 void assign_subtrees(TSNode, SubtreeRegistry *);
+
+bool
+compute_edit_script_recurse(TSNode, TSNode, EditScriptBuffer *, const char *, const char *,
+                            const TSLiteralMap *);
+
+void
+compute_edit_script(TSNode, TSNode, void *, TSSymbol, uint32_t, EditScriptBuffer *, const char *, const char *,
+                    const TSLiteralMap *);
+
+void unload_unassigned(TSNode, EditScriptBuffer *);
 
 void
 select_available_tree(NodeEntryArray *, const TSTree *, bool, SubtreeRegistry *);
@@ -182,6 +193,23 @@ static inline void foreach_tree_assign_share_and_register_tree(TSNode node, Subt
   }
   foreach_subtree_assign_share_and_register_tree(node, registry);
 };
+
+static inline void foreach_subtree_unload_unassigned(TSNode node, EditScriptBuffer *buffer) {
+  TSTreeCursor cursor = ts_tree_cursor_new(node);
+  int lvl = 0;
+  do {
+    unload_unassigned(ts_tree_cursor_current_node(&cursor), buffer);
+    while (ts_tree_cursor_goto_first_child(&cursor)) {
+      lvl++;
+      unload_unassigned(ts_tree_cursor_current_node(&cursor), buffer);
+    }
+    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+      lvl--;
+      ts_tree_cursor_goto_parent(&cursor);
+    }
+  } while (lvl > 0);
+  ts_tree_cursor_delete(&cursor);
+}
 
 static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
   return ts_tree_cursor_new(ts_tree_root_node(tree));

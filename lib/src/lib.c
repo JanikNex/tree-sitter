@@ -21,5 +21,7 @@
 #include "./diff_graph.c"
 #include "./subtree_registry.c"
 #include "./subtree_share.c"
+#include "./edit_script_buffer.c"
+#include "./edit_script.c"
 #include "sha_digest/sha256.c"
 #include "rax/rax.c"
