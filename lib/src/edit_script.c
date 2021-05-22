@@ -15,7 +15,8 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
     switch (edit->type) {
       case UPDATE:
         printf("[UPDATE | %p] Old literal from %d (%d) => New literal from %d (%d)\n", subtree_id,
-               edit->update.old_start, edit->update.old_length, edit->update.new_start, edit->update.new_length);
+               edit->update.old_start.bytes, edit->update.old_size.bytes, edit->update.new_start.bytes,
+               edit->update.new_size.bytes);
         break;
       case LOAD:
         printf("[LOAD | %p]\n", subtree_id);

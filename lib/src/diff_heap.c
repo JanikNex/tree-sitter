@@ -205,15 +205,21 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
 static inline void
 update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
                 const TSLiteralMap *literal_map) {
-  if (ts_literal_map_is_literal(literal_map, ts_node_symbol(self))) {
+  if (ts_literal_map_is_literal(literal_map, ts_node_symbol(self)) &&
+      ts_literal_map_is_literal(literal_map, ts_node_symbol(other))) {
     size_t self_literal_len = ts_node_end_byte(self) - ts_node_start_byte(self);
     size_t other_literal_len = ts_node_end_byte(other) - ts_node_start_byte(other);
     if (self_literal_len != other_literal_len || (0 != memcmp(((self_code) + ts_node_start_byte(self)),
                                                               ((other_code) + ts_node_start_byte(other)),
                                                               self_literal_len))) {
+      Subtree *self_subtree = (Subtree *) self.id;
+      Subtree *other_subtree = (Subtree *) other.id;
+      Length old_start = {.bytes=ts_node_start_byte(self), .extent=ts_node_start_point(self)};
+      Length old_size = ts_subtree_size(*self_subtree);
+      Length new_start = {.bytes=ts_node_start_byte(other), .extent=ts_node_start_point(other)};
+      Length new_size = ts_subtree_size(*other_subtree);
       ts_edit_script_buffer_add(buffer, (Edit) {.type=UPDATE, .subtree=(Subtree *) self.id,
-        .update={.old_start=ts_node_start_byte(self), .old_length=self_literal_len,
-          .new_start=ts_node_start_byte(other), .new_length=other_literal_len}});
+        .update={.old_start=old_start, .old_size=old_size, .new_start=new_start, .new_size=new_size}});
     }
   }
 }

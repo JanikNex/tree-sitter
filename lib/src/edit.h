@@ -17,10 +17,10 @@ typedef struct {
             TSSymbol parent_tag;
         } basic;
         struct {
-            uint32_t old_start;
-            size_t old_length;
-            uint32_t new_start;
-            size_t new_length;
+            Length old_start;
+            Length old_size;
+            Length new_start;
+            Length new_size;
         } update;
     };
 } Edit;
