@@ -272,12 +272,18 @@ bool compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer *bu
 }
 
 void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
-  TSDiffHeap *this_diff_heap = (TSDiffHeap *) self.diff_heap;
+  Subtree *self_subtree = (Subtree *) self.id;
+  TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   if (this_diff_heap->assigned != NULL) {
-    this_diff_heap->assigned = NULL; // TODO: Prevents assignment graph
+    //this_diff_heap->assigned = NULL; // TODO: Why should this be set to NULL?
   } else {
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {.type=UNLOAD, .subtree=(Subtree *) self.id}); //TODO: Insert correct Subtree
+                              (Edit) {.type=UNLOAD, .subtree=self_subtree, .loading={.tag=ts_node_symbol(
+                                self)}}); //TODO: Insert correct Subtree
+    for (uint32_t i = 0; i < ts_node_child_count(self); i++) {
+      TSNode child = ts_node_child(self, i);
+      unload_unassigned(child, buffer);
+    }
   }
 }
 
@@ -315,7 +321,7 @@ void compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol pa
   }
   ts_edit_script_buffer_add(buffer,
                             (Edit) {.type=DETACH, .subtree=(Subtree *) self.id, .basic={.link=link, .parent=parent_id, .parent_tag=parent_type}});
-  foreach_subtree_unload_unassigned(self, buffer);
+  unload_unassigned(self, buffer);
   load_unassigned(other, buffer, self_code, other_code, literal_map, self.tree);
   ts_edit_script_buffer_add(buffer,
                             (Edit) {.type=ATTACH, .subtree=NULL, .basic={.link=link, .parent=parent_id, .parent_tag=parent_type}}); //TODO: Insert correct Subtree

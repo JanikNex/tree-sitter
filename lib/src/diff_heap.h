@@ -194,23 +194,6 @@ static inline void foreach_tree_assign_share_and_register_tree(TSNode node, Subt
   foreach_subtree_assign_share_and_register_tree(node, registry);
 };
 
-static inline void foreach_subtree_unload_unassigned(TSNode node, EditScriptBuffer *buffer) {
-  TSTreeCursor cursor = ts_tree_cursor_new(node);
-  int lvl = 0;
-  do {
-    unload_unassigned(ts_tree_cursor_current_node(&cursor), buffer);
-    while (ts_tree_cursor_goto_first_child(&cursor)) {
-      lvl++;
-      unload_unassigned(ts_tree_cursor_current_node(&cursor), buffer);
-    }
-    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
-      lvl--;
-      ts_tree_cursor_goto_parent(&cursor);
-    }
-  } while (lvl > 0);
-  ts_tree_cursor_delete(&cursor);
-}
-
 static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
   return ts_tree_cursor_new(ts_tree_root_node(tree));
 }
