@@ -287,20 +287,25 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   }
 }
 
-static void load_unassigned(TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
-                            const TSLiteralMap *literal_map, const TSTree *self_tree) {
+static void *load_unassigned(TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
+                             const TSLiteralMap *literal_map, const TSTree *self_tree) {
   const TSDiffHeap *other_diff_heap = other.diff_heap;
   if (other_diff_heap->assigned != NULL) {
     const Subtree *assigned_subtree = other_diff_heap->assigned;
     TSNode assigned_node = ts_diff_heap_node(assigned_subtree, self_tree);
     update_literals_iter(assigned_node, other, buffer, self_code, other_code, literal_map);
-    return;
+    return other_diff_heap->id;
   }
+  ChildPrototypeArray kids = array_new();
   for (uint32_t i = 0; i < ts_node_child_count(other); i++) {
     TSNode other_kid = ts_node_child(other, i);
-    load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree);
+    void *kid_id = load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree);
+    array_push(&kids, (ChildPrototype) {.child_id=kid_id});
   }
-  ts_edit_script_buffer_add(buffer, (Edit) {.type=LOAD, .subtree=NULL}); //TODO: Insert correct Subtree
+  void *new_id = generate_new_id();
+  ts_edit_script_buffer_add(buffer, (Edit) {.type=LOAD, .subtree=NULL, .loading={.tag=ts_node_symbol(
+    other), .id=new_id, .kids=kids}}); //TODO: Do we have a subtree?
+  return new_id;
 }
 
 void compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol parent_type, uint32_t link,
@@ -320,11 +325,11 @@ void compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol pa
     }
   }
   ts_edit_script_buffer_add(buffer,
-                            (Edit) {.type=DETACH, .subtree=(Subtree *) self.id, .basic={.link=link, .parent=parent_id, .parent_tag=parent_type}});
+                            (Edit) {.type=DETACH, .subtree=(Subtree *) self.id, .basic={.id=this_diff_heap->id, .link=link, .parent_id=parent_id, .parent_tag=parent_type}});
   unload_unassigned(self, buffer);
-  load_unassigned(other, buffer, self_code, other_code, literal_map, self.tree);
+  void *new_id = load_unassigned(other, buffer, self_code, other_code, literal_map, self.tree);
   ts_edit_script_buffer_add(buffer,
-                            (Edit) {.type=ATTACH, .subtree=NULL, .basic={.link=link, .parent=parent_id, .parent_tag=parent_type}}); //TODO: Insert correct Subtree
+                            (Edit) {.type=ATTACH, .subtree=NULL, .basic={.id=new_id, .link=link, .parent_id=parent_id, .parent_tag=parent_type}}); //TODO: Insert correct Subtree
 }
 
 

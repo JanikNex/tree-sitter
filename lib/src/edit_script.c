@@ -19,24 +19,56 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
                edit->update.new_size.bytes);
         break;
       case LOAD:
-        printf("[LOAD | %p]\n", subtree_id);
+        if (edit->loading.kids.size == 0) {
+          printf("[LOAD | >%p<] Load new leaf of type \"%s\"\n", edit->loading.id,
+                 ts_language_symbol_name(language, edit->loading.tag));
+        } else {
+          printf("[LOAD | >%p<] Load new subtree of type \"%s\" with kids [", edit->loading.id,
+                 ts_language_symbol_name(language, edit->loading.tag));
+          for (uint32_t j = 0; j < edit->loading.kids.size; j++) {
+            ChildPrototype *prototype = array_get(&edit->loading.kids, j);
+            if (j > 0) {
+              printf(", ");
+            }
+            printf("%p", prototype->child_id);
+          }
+          printf("]\n");
+        }
         break;
       case ATTACH:
-        printf("[ATTACH | %p] To parent %p of type %s on link %d\n", subtree_id, edit->basic.parent,
+        printf("[ATTACH | %p] To parent %p of type \"%s\" on link %d\n", edit->basic.id, edit->basic.parent_id,
                ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
       case LOAD_ATTACH:
-        printf("[LOAD_ATTACH | %p]\n", subtree_id);
+        if (edit->loading.kids.size == 0) {
+          printf("[LOAD_ATTACH | >%p<] Load new leaf of type \"%s\" and attach to parent %p of type %s on link %d\n",
+                 edit->advanced.id,
+                 ts_language_symbol_name(language, edit->advanced.tag), edit->advanced.parent_id,
+                 ts_language_symbol_name(language, edit->advanced.parent_tag), edit->advanced.link);
+        } else {
+          printf("[LOAD_ATTACH | >%p<] Load new subtree of type \"%s\" with kids [", edit->advanced.id,
+                 ts_language_symbol_name(language, edit->advanced.tag));
+          for (uint32_t j = 0; j < edit->advanced.kids.size; j++) {
+            ChildPrototype *prototype = array_get(&edit->advanced.kids, j);
+            if (j > 0) {
+              printf(", ");
+            }
+            printf("%p", prototype->child_id);
+          }
+          printf("] and attach to parent %p of type \"%s\" on link %d\n", edit->advanced.parent_id,
+                 ts_language_symbol_name(language, edit->advanced.parent_tag), edit->advanced.link);
+        }
         break;
       case DETACH:
-        printf("[DETACH | %p] From parent %p of type %s on link %d\n", subtree_id, edit->basic.parent,
+        printf("[DETACH | %p] From parent %p of type \"%s\" on link %d\n", subtree_id, edit->basic.parent_id,
                ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
       case UNLOAD:
-        printf("[UNLOAD | %p]\n", subtree_id);
+        printf("[UNLOAD | \"%p\"] %s\n", subtree_id, ts_language_symbol_name(language, edit->loading.tag));
         break;
       case DETACH_UNLOAD:
-        printf("[DETACH_UNLOAD | %p]\n", subtree_id);
+        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d\n", subtree_id,
+               edit->basic.parent_id, ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
     }
   }
