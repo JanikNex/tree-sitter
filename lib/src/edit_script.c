@@ -14,14 +14,14 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
                edit->update.new_size.bytes);
         break;
       case LOAD:
-        if (edit->loading.kids.size == 0) {
+        if (edit->loading.is_leaf) {
           printf("[LOAD | >%p<] Load new leaf of type \"%s\"\n", edit->id,
                  ts_language_symbol_name(language, edit->loading.tag));
         } else {
           printf("[LOAD | >%p<] Load new subtree of type \"%s\" with kids [", edit->id,
                  ts_language_symbol_name(language, edit->loading.tag));
-          for (uint32_t j = 0; j < edit->loading.kids.size; j++) {
-            ChildPrototype *prototype = array_get(&edit->loading.kids, j);
+          for (uint32_t j = 0; j < edit->loading.node.kids.size; j++) {
+            ChildPrototype *prototype = array_get(&edit->loading.node.kids, j);
             if (j > 0) {
               printf(", ");
             }
@@ -35,7 +35,7 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
                ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
       case LOAD_ATTACH:
-        if (edit->loading.kids.size == 0) {
+        if (edit->loading.is_leaf) {
           printf("[LOAD_ATTACH | >%p<] Load new leaf of type \"%s\" and attach to parent %p of type %s on link %d\n",
                  edit->id,
                  ts_language_symbol_name(language, edit->advanced.tag), edit->advanced.parent_id,

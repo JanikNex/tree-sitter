@@ -30,9 +30,23 @@ typedef struct {
             Length new_size;
         } update;
         struct { // Load
-            bool is_leaf;
+            bool is_leaf: 1;
             TSSymbol tag;
-            ChildPrototypeArray kids;
+            union {
+                struct {
+                    Length padding;
+                    Length size;
+                    uint32_t lookahead_bytes;
+                    TSStateId parse_state;
+                    bool has_external_tokens: 1;
+                    bool depends_on_column: 1;
+                    bool is_keyword: 1;
+                } leaf;
+                struct {
+                    ChildPrototypeArray kids;
+                    uint16_t production_id;
+                } node;
+            };
         } loading;
         struct { // Load_Attach
             uint32_t link;

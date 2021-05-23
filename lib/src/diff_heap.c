@@ -303,8 +303,33 @@ static void *load_unassigned(TSNode other, EditScriptBuffer *buffer, const char 
     array_push(&kids, (ChildPrototype) {.child_id=kid_id});
   }
   void *new_id = generate_new_id();
-  ts_edit_script_buffer_add(buffer, (Edit) {.type=LOAD, .subtree=NULL, .id=new_id, .loading={.tag=ts_node_symbol(
-    other), .kids=kids}}); //TODO: Do we have a subtree?
+  Subtree *other_subtree = (Subtree *) other.id;
+  if (kids.size == 0) {
+    ts_edit_script_buffer_add(buffer,
+                              (Edit) {.type=LOAD, .subtree=NULL, .id=new_id,
+                                .loading={
+                                  .is_leaf=true,
+                                  .tag=ts_node_symbol(other),
+                                  .leaf={
+                                    .padding=ts_subtree_padding(*other_subtree),
+                                    .size=ts_subtree_size(*other_subtree),
+                                    .lookahead_bytes=ts_subtree_lookahead_bytes(*other_subtree),
+                                    .parse_state=ts_subtree_parse_state(*other_subtree),
+                                    .has_external_tokens=ts_subtree_has_external_tokens(*other_subtree),
+                                    .depends_on_column=ts_subtree_depends_on_column(*other_subtree),
+                                    .is_keyword=ts_subtree_is_keyword(*other_subtree)
+                                  }}});
+  } else {
+    ts_edit_script_buffer_add(buffer,
+                              (Edit) {.type=LOAD, .subtree=NULL, .id=new_id,
+                                .loading={
+                                  .is_leaf=false,
+                                  .tag=ts_node_symbol(other),
+                                  .node={
+                                    .kids=kids,
+                                    .production_id = ts_subtree_production_id(*other_subtree)
+                                  }}}); //TODO: Do we have a subtree?
+  }
   return new_id;
 }
 
