@@ -16,26 +16,25 @@ typedef enum {
 typedef struct {
     EditType type;
     Subtree *subtree;
+    void *id;
     union {
-        struct {
-            void *id;
+        struct { // Attach and Detach
             uint32_t link;
             void *parent_id;
             TSSymbol parent_tag;
         } basic;
-        struct {
+        struct { // Update
             Length old_start;
             Length old_size;
             Length new_start;
             Length new_size;
         } update;
-        struct {
-            void *id;
+        struct { // Load
+            bool is_leaf;
             TSSymbol tag;
             ChildPrototypeArray kids;
         } loading;
-        struct {
-            void *id;
+        struct { // Load_Attach
             uint32_t link;
             void *parent_id;
             TSSymbol parent_tag;

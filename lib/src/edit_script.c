@@ -7,23 +7,18 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
   const EditArray edit_array = edit_script->edits;
   for (uint32_t i = 0; i < edit_array.size; i++) {
     Edit *edit = array_get(&edit_array, i);
-    void *subtree_id = NULL;
-    if (edit->subtree != NULL) {
-      TSDiffHeap *edit_diff_heap = ts_subtree_node_diff_heap(*edit->subtree);
-      subtree_id = edit_diff_heap->id;
-    }
     switch (edit->type) {
       case UPDATE:
-        printf("[UPDATE | %p] Old literal from %d (%d) => New literal from %d (%d)\n", subtree_id,
+        printf("[UPDATE | %p] Old literal from %d (%d) => New literal from %d (%d)\n", edit->id,
                edit->update.old_start.bytes, edit->update.old_size.bytes, edit->update.new_start.bytes,
                edit->update.new_size.bytes);
         break;
       case LOAD:
         if (edit->loading.kids.size == 0) {
-          printf("[LOAD | >%p<] Load new leaf of type \"%s\"\n", edit->loading.id,
+          printf("[LOAD | >%p<] Load new leaf of type \"%s\"\n", edit->id,
                  ts_language_symbol_name(language, edit->loading.tag));
         } else {
-          printf("[LOAD | >%p<] Load new subtree of type \"%s\" with kids [", edit->loading.id,
+          printf("[LOAD | >%p<] Load new subtree of type \"%s\" with kids [", edit->id,
                  ts_language_symbol_name(language, edit->loading.tag));
           for (uint32_t j = 0; j < edit->loading.kids.size; j++) {
             ChildPrototype *prototype = array_get(&edit->loading.kids, j);
@@ -36,17 +31,17 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         }
         break;
       case ATTACH:
-        printf("[ATTACH | %p] To parent %p of type \"%s\" on link %d\n", edit->basic.id, edit->basic.parent_id,
+        printf("[ATTACH | %p] To parent %p of type \"%s\" on link %d\n", edit->id, edit->basic.parent_id,
                ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
       case LOAD_ATTACH:
         if (edit->loading.kids.size == 0) {
           printf("[LOAD_ATTACH | >%p<] Load new leaf of type \"%s\" and attach to parent %p of type %s on link %d\n",
-                 edit->advanced.id,
+                 edit->id,
                  ts_language_symbol_name(language, edit->advanced.tag), edit->advanced.parent_id,
                  ts_language_symbol_name(language, edit->advanced.parent_tag), edit->advanced.link);
         } else {
-          printf("[LOAD_ATTACH | >%p<] Load new subtree of type \"%s\" with kids [", edit->advanced.id,
+          printf("[LOAD_ATTACH | >%p<] Load new subtree of type \"%s\" with kids [", edit->id,
                  ts_language_symbol_name(language, edit->advanced.tag));
           for (uint32_t j = 0; j < edit->advanced.kids.size; j++) {
             ChildPrototype *prototype = array_get(&edit->advanced.kids, j);
@@ -60,14 +55,14 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         }
         break;
       case DETACH:
-        printf("[DETACH | %p] From parent %p of type \"%s\" on link %d\n", subtree_id, edit->basic.parent_id,
+        printf("[DETACH | %p] From parent %p of type \"%s\" on link %d\n", edit->id, edit->basic.parent_id,
                ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
       case UNLOAD:
-        printf("[UNLOAD | \"%p\"] %s\n", subtree_id, ts_language_symbol_name(language, edit->loading.tag));
+        printf("[UNLOAD | \"%p\"] %s\n", edit->id, ts_language_symbol_name(language, edit->loading.tag));
         break;
       case DETACH_UNLOAD:
-        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d\n", subtree_id,
+        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d\n", edit->id,
                edit->basic.parent_id, ts_language_symbol_name(language, edit->basic.parent_tag), edit->basic.link);
         break;
     }

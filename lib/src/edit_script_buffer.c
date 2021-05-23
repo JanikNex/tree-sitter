@@ -19,12 +19,10 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
 #ifdef ADVANCED_EDITS
       if (pos_buff->size > 0) {
         Edit *last_edit = array_back(pos_buff);
-        if (last_edit->type == LOAD && last_edit->loading.id == edit.basic.id) {
-          void *id = last_edit->loading.id;
+        if (last_edit->type == LOAD && last_edit->id == edit.id) {
           TSSymbol symbol = last_edit->loading.tag;
           ChildPrototypeArray child_array = last_edit->loading.kids;
           last_edit->type = LOAD_ATTACH;
-          last_edit->advanced.id = id;
           last_edit->advanced.tag = symbol;
           last_edit->advanced.kids = child_array;
           last_edit->advanced.link = edit.basic.link;
