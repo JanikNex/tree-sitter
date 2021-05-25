@@ -9,23 +9,6 @@ typedef struct {
 
 typedef Array(ChildPrototype) ChildPrototypeArray;
 
-typedef enum {
-    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE
-} EditType;
-
-typedef struct { // Attach and Detach
-    uint32_t link;
-    void *parent_id;
-    TSSymbol parent_tag;
-} EditDataBasic;
-
-typedef struct { // Update
-    Length old_start;
-    Length old_size;
-    Length new_start;
-    Length new_size;
-} EditDataUpdate;
-
 typedef struct {
     Length padding;
     Length size;
@@ -41,17 +24,57 @@ typedef struct {
     uint16_t production_id;
 } EditNodeData;
 
-typedef struct { // Load
+typedef enum {
+    CORE_ATTACH, CORE_DETACH, CORE_UNLOAD, CORE_LOAD, CORE_UPDATE
+} CoreEditTag;
+
+typedef enum {
+    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE
+} EditTag;
+
+typedef struct {
+    void *id;
+    uint32_t link;
+    void *parent_id;
+    TSSymbol parent_tag;
+} Attach;
+
+typedef struct {
+    Subtree *subtree;
+    void *id;
+    uint32_t link;
+    void *parent_id;
+    TSSymbol parent_tag;
+} Detach;
+
+typedef struct {
+    TSSymbol tag;
+    Subtree *subtree;
+    void *id;
+} Unload;
+
+typedef struct {
     bool is_leaf: 1;
     TSSymbol tag;
+    void *id;
     union {
         EditLeafData leaf;
         EditNodeData node;
     };
-} EditDataLoading;
+} Load;
 
-typedef struct { // Load_Attach
+typedef struct {
+    Subtree *subtree;
+    void *id;
+    Length old_start;
+    Length old_size;
+    Length new_start;
+    Length new_size;
+} Update;
+
+typedef struct {
     bool is_leaf: 1;
+    void *id;
     uint32_t link;
     void *parent_id;
     TSSymbol parent_tag;
@@ -60,20 +83,42 @@ typedef struct { // Load_Attach
         EditLeafData leaf;
         EditNodeData node;
     };
-} EditDataAdvanced;
+} LoadAttach;
 
 typedef struct {
-    EditType type;
     Subtree *subtree;
     void *id;
+    uint32_t link;
+    void *parent_id;
+    TSSymbol parent_tag;
+    TSSymbol tag;
+} DetachUnload;
+
+typedef struct {
+    CoreEditTag edit_tag;
     union {
-        EditDataBasic basic;
-        EditDataUpdate update;
-        EditDataLoading loading;
-        EditDataAdvanced advanced;
+        Attach attach;
+        Detach detach;
+        Unload unload;
+        Load load;
+        Update update;
+    };
+} CoreEdit;
+
+typedef struct {
+    EditTag edit_tag;
+    union {
+        Attach attach;
+        Detach detach;
+        Unload unload;
+        Load load;
+        Update update;
+        LoadAttach load_attach;
+        DetachUnload detach_unload;
     };
 } Edit;
 
 typedef Array(Edit) EditArray;
+typedef Array(CoreEdit) CoreEditArray;
 
 #endif //TREE_SITTER_EDIT_H

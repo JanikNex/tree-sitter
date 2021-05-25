@@ -218,17 +218,18 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
       Length old_size = ts_subtree_size(*self_subtree);
       Length new_start = {.bytes=ts_node_start_byte(other), .extent=ts_node_start_point(other)};
       Length new_size = ts_subtree_size(*other_subtree);
+      Update update_data = {
+        .subtree=self_subtree,
+        .id=self.diff_heap->id,
+        .old_start=old_start,
+        .old_size=old_size,
+        .new_start=new_start,
+        .new_size=new_size
+      };
       ts_edit_script_buffer_add(buffer,
                                 (Edit) {
-                                  .type=UPDATE,
-                                  .subtree=(Subtree *) self.id,
-                                  .id=self.diff_heap->id,
-                                  .update={
-                                    .old_start=old_start,
-                                    .old_size=old_size,
-                                    .new_start=new_start,
-                                    .new_size=new_size
-                                  }
+                                  .edit_tag=UPDATE,
+                                  .update=update_data
                                 });
       Length padding_change = length_add(prev_edit.padding, length_sub(ts_subtree_padding(*other_subtree),
                                                                        ts_subtree_padding(*self_subtree)));
@@ -320,14 +321,15 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   if (this_diff_heap->assigned != NULL) {
     //this_diff_heap->assigned = NULL; // TODO: Why should this be set to NULL?
   } else {
+    Unload unload_data = {
+      .id=this_diff_heap->id,
+      .subtree=self_subtree,
+      .tag=ts_node_symbol(self)
+    };
     ts_edit_script_buffer_add(buffer,
                               (Edit) {
-                                .type=UNLOAD,
-                                .subtree=self_subtree,
-                                .id=this_diff_heap->id,
-                                .loading={
-                                  .tag=ts_node_symbol(self)
-                                }
+                                .edit_tag=UNLOAD,
+                                .unload=unload_data
                               }); //TODO: Insert correct Subtree
     for (uint32_t i = 0; i < ts_node_child_count(self); i++) {
       TSNode child = ts_node_child(self, i);
@@ -352,6 +354,10 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
   SHA256_Context structural_context;
   SHA256_Context literal_context;
   ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code);
+  Load load_data = {
+    .id=new_id,
+    .tag=ts_node_symbol(other),
+  };
   if (ts_node_child_count(other) > 0) {
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
@@ -369,34 +375,31 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
                                                   ts_subtree_production_id(*other_subtree), self_tree->language);
     ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap);
     Subtree new_node = ts_subtree_from_mut(mut_node);
+    load_data.is_leaf = false;
+    EditNodeData node_data = {.kids=child_prototypes, .production_id=ts_subtree_production_id(*other_subtree)};
+    load_data.node = node_data;
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {.type=LOAD, .subtree=NULL, .id=new_id,
-                                .loading={
-                                  .is_leaf=false,
-                                  .tag=ts_node_symbol(other),
-                                  .node={
-                                    .kids=child_prototypes,
-                                    .production_id = ts_subtree_production_id(*other_subtree)
-                                  }
-                                }
-                              }); //TODO: Do we have a subtree?
+                              (Edit) {
+                                .edit_tag=LOAD,
+                                .load=load_data
+                              });
     return new_node;
   } else {
+    load_data.is_leaf = true;
+    EditLeafData leaf_data = {
+      .padding=ts_subtree_padding(*other_subtree),
+      .size=ts_subtree_size(*other_subtree),
+      .lookahead_bytes=ts_subtree_lookahead_bytes(*other_subtree),
+      .parse_state=ts_subtree_parse_state(*other_subtree),
+      .has_external_tokens=ts_subtree_has_external_tokens(*other_subtree),
+      .depends_on_column=ts_subtree_depends_on_column(*other_subtree),
+      .is_keyword=ts_subtree_is_keyword(*other_subtree)
+    };
+    load_data.leaf = leaf_data;
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {.type=LOAD, .subtree=NULL, .id=new_id,
-                                .loading={
-                                  .is_leaf=true,
-                                  .tag=ts_node_symbol(other),
-                                  .leaf={
-                                    .padding=ts_subtree_padding(*other_subtree),
-                                    .size=ts_subtree_size(*other_subtree),
-                                    .lookahead_bytes=ts_subtree_lookahead_bytes(*other_subtree),
-                                    .parse_state=ts_subtree_parse_state(*other_subtree),
-                                    .has_external_tokens=ts_subtree_has_external_tokens(*other_subtree),
-                                    .depends_on_column=ts_subtree_depends_on_column(*other_subtree),
-                                    .is_keyword=ts_subtree_is_keyword(*other_subtree)
-                                  }
-                                }
+                              (Edit) {
+                                .edit_tag=LOAD,
+                                .load = load_data
                               });
     Subtree new_leaf = ts_subtree_new_leaf(subtree_pool, ts_node_symbol(other), ts_subtree_padding(*other_subtree),
                                            ts_subtree_size(*other_subtree),
@@ -411,6 +414,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     new_leaf = ts_subtree_from_mut(mut_leaf);
     return new_leaf;
   }
+
 }
 
 Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol parent_type, uint32_t link,
@@ -433,31 +437,32 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
       return rec_gen_subtree;
     }
   }
+  Detach detach_data = {
+    .id=this_diff_heap->id,
+    .subtree=this_subtree,
+    .link=link,
+    .parent_id=parent_id,
+    .parent_tag=parent_type
+  };
   ts_edit_script_buffer_add(buffer,
                             (Edit) {
-                              .type=DETACH,
-                              .subtree=(Subtree *) self.id,
-                              .id=this_diff_heap->id,
-                              .basic={
-                                .link=link,
-                                .parent_id=parent_id,
-                                .parent_tag=parent_type
-                              }
+                              .edit_tag=DETACH,
+                              .detach=detach_data
                             });
   unload_unassigned(self, buffer);
   Subtree new_subtree = load_unassigned(other, buffer, self_code, other_code, literal_map, self.tree, subtree_pool);
   TSDiffHeap *new_subtree_diff_heap = ts_subtree_node_diff_heap(new_subtree);
+  Attach attach_data = {
+    .id=new_subtree_diff_heap->id,
+    .link=link,
+    .parent_tag=parent_type,
+    .parent_id=parent_id
+  };
   ts_edit_script_buffer_add(buffer,
                             (Edit) {
-                              .type=ATTACH,
-                              .subtree=NULL,
-                              .id=new_subtree_diff_heap->id,
-                              .basic={
-                                .link=link,
-                                .parent_id=parent_id,
-                                .parent_tag=parent_type
-                              }
-                            }); //TODO: Insert correct Subtree
+                              .edit_tag=ATTACH,
+                              .attach=attach_data
+                            });
   return new_subtree;
 }
 
