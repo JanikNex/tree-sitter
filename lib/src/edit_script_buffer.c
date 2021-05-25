@@ -72,9 +72,11 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
   }
 }
 
-EditScript ts_edit_script_buffer_finalize(EditScriptBuffer *buffer) {
+EditScript *ts_edit_script_buffer_finalize(EditScriptBuffer *buffer) {
   array_push_all(&buffer->negative_buffer, &buffer->positive_buffer);
   array_delete(&buffer->positive_buffer);
   printf("Generated %d edits!\n", buffer->negative_buffer.size);
-  return (EditScript) {.edits = buffer->negative_buffer};
+  EditScript *edit_script = ts_malloc(sizeof(EditScript));
+  edit_script->edits = buffer->negative_buffer;
+  return edit_script;
 }

@@ -3,9 +3,9 @@
 
 #include "edit_script.h"
 
-typedef struct {
+struct EditScript {
     EditArray edits;
-} EditScript;
+};
 
 void print_edit_script(const TSLanguage *, const EditScript *);
 

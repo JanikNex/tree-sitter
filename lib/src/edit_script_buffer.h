@@ -16,6 +16,6 @@ EditScriptBuffer ts_edit_script_buffer_create();
 
 void ts_edit_script_buffer_add(EditScriptBuffer *, Edit);
 
-EditScript ts_edit_script_buffer_finalize(EditScriptBuffer *);
+EditScript *ts_edit_script_buffer_finalize(EditScriptBuffer *);
 
 #endif //TREE_SITTER_EDIT_SCRIPT_BUFFER_H

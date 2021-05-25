@@ -42,6 +42,7 @@ typedef struct TSQuery TSQuery;
 typedef struct TSQueryCursor TSQueryCursor;
 typedef struct TSDiffHeap TSDiffHeap;
 typedef struct TSLiteralMap TSLiteralMap;
+typedef struct EditScript EditScript;
 
 typedef enum {
   TSInputEncodingUTF8,
@@ -135,6 +136,11 @@ typedef enum {
   TSQueryErrorCapture,
   TSQueryErrorStructure,
 } TSQueryError;
+
+typedef struct {
+    TSTree *constructed_tree;
+    EditScript *edit_script;
+} TSDiffResult;
 
 /********************/
 /* Section - Parser */
@@ -928,9 +934,11 @@ void ts_literal_map_add_literal(const TSLiteralMap *, uint16_t);
  */
 void ts_literal_map_destroy(TSLiteralMap *);
 
-TSTree *ts_compare_to(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *);
+TSDiffResult ts_compare_to(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *);
 
 void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
+
+void ts_edit_script_delete(EditScript *);
 
 #ifdef __cplusplus
 }

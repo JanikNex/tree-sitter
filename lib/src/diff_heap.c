@@ -467,8 +467,9 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
 }
 
 
-TSTree *ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self_code, const char *other_code,
-                      const TSLiteralMap *literal_map) { //TODO: Cleanup -> free used memory
+TSDiffResult
+ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self_code, const char *other_code,
+              const TSLiteralMap *literal_map) { //TODO: Cleanup -> free used memory
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
   printf("Create SubtreeRegistry\n");
@@ -486,9 +487,9 @@ TSTree *ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const ch
                                                  self_code, other_code,
                                                  literal_map); // TODO: Look for correct initial parameters!
   printf("Finalize EditScriptBuffer\n");
-  EditScript edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
+  EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
   printf("==== EDIT SCRIPT ====\n");
-  print_edit_script(this_tree->language, &edit_script);
+  print_edit_script(this_tree->language, edit_script);
   printf("Balance Subtree\n");
   ts_subtree_balance(computed_subtree, &subtree_pool, this_tree->language);
   printf("Constructing Tree\n");
@@ -499,5 +500,5 @@ TSTree *ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const ch
     that_tree->included_range_count
   );
   printf("EQUALITY CHECK: %d\n", ts_subtree_compare(*(Subtree *) other.id, computed_subtree));
-  return result;
+  return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script};
 }

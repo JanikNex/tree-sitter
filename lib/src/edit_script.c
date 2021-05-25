@@ -121,3 +121,8 @@ CoreEditArray edit_as_core_edit(Edit edit) {
   }
   return result;
 }
+
+void ts_edit_script_delete(EditScript *edit_script) {
+  array_delete(&edit_script->edits);
+  ts_free(edit_script);
+}
