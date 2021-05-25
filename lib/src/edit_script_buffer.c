@@ -21,13 +21,20 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
         Edit *last_edit = array_back(pos_buff);
         if (last_edit->type == LOAD && last_edit->id == edit.id) {
           TSSymbol symbol = last_edit->loading.tag;
-          ChildPrototypeArray child_array = last_edit->loading.kids;
           last_edit->type = LOAD_ATTACH;
-          last_edit->advanced.tag = symbol;
-          last_edit->advanced.kids = child_array;
+          if (last_edit->loading.is_leaf) {
+            EditNodeData node_data = last_edit->loading.node;
+            last_edit->advanced.is_leaf = true;
+            last_edit->advanced.node = node_data;
+          } else {
+            EditLeafData leaf_data = last_edit->loading.leaf;
+            last_edit->advanced.is_leaf = false;
+            last_edit->advanced.leaf = leaf_data;
+          }
           last_edit->advanced.link = edit.basic.link;
           last_edit->advanced.parent_tag = edit.basic.parent_tag;
-          last_edit->advanced.parent_id = edit.advanced.parent_id;
+          last_edit->advanced.parent_id = edit.basic.parent_id;
+          last_edit->advanced.tag = symbol;
         }
       } else {
         array_push(pos_buff, edit);

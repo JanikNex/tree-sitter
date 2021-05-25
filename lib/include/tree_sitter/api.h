@@ -928,7 +928,7 @@ void ts_literal_map_add_literal(const TSLiteralMap *, uint16_t);
  */
 void ts_literal_map_destroy(TSLiteralMap *);
 
-void ts_compare_to(TSNode, TSNode, const char *, const char *, const TSLiteralMap *);
+TSTree *ts_compare_to(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *);
 
 void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
 

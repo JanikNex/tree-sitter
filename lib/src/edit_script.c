@@ -43,8 +43,9 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         } else {
           printf("[LOAD_ATTACH | >%p<] Load new subtree of type \"%s\" with kids [", edit->id,
                  ts_language_symbol_name(language, edit->advanced.tag));
-          for (uint32_t j = 0; j < edit->advanced.kids.size; j++) {
-            ChildPrototype *prototype = array_get(&edit->advanced.kids, j);
+          EditNodeData *node_data = &edit->advanced.node;
+          for (uint32_t j = 0; j < node_data->kids.size; j++) {
+            ChildPrototype *prototype = array_get(&node_data->kids, j);
             if (j > 0) {
               printf(", ");
             }

@@ -35,6 +35,11 @@ typedef struct {
     bool valid;
 } NodeEntry;
 
+typedef struct {
+    Length size;
+    Length padding;
+} LiteralEdit;
+
 typedef Array(NodeEntry) NodeEntryArray;
 
 TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
@@ -43,12 +48,13 @@ void assign_shares(TSNode, TSNode, SubtreeRegistry *);
 
 void assign_subtrees(TSNode, SubtreeRegistry *);
 
-bool
-compute_edit_script_recurse(TSNode, TSNode, EditScriptBuffer *, const char *, const char *,
+Subtree
+compute_edit_script_recurse(TSNode, TSNode, EditScriptBuffer *, SubtreePool *, const char *, const char *,
                             const TSLiteralMap *);
 
-void
-compute_edit_script(TSNode, TSNode, void *, TSSymbol, uint32_t, EditScriptBuffer *, const char *, const char *,
+Subtree
+compute_edit_script(TSNode, TSNode, void *, TSSymbol, uint32_t, EditScriptBuffer *, SubtreePool *, const char *,
+                    const char *,
                     const TSLiteralMap *);
 
 void unload_unassigned(TSNode, EditScriptBuffer *);
@@ -71,6 +77,16 @@ static inline void *generate_new_id() { // TODO: Is there a better way to genera
 static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
+  node_diff_heap->assigned = NULL;
+  node_diff_heap->share = NULL;
+  node_diff_heap->skip_node = 0;
+  node_diff_heap->position = pos;
+  return node_diff_heap;
+}
+
+static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
+  TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
+  node_diff_heap->id = id;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
   node_diff_heap->skip_node = 0;
