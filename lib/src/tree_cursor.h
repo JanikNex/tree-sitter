@@ -28,4 +28,10 @@ void ts_tree_cursor_current_status(
 
 TSNode ts_tree_cursor_parent_node(const TSTreeCursor *);
 
+bool ts_diff_tree_cursor_goto_parent(TSTreeCursor *);
+
+bool ts_diff_tree_cursor_goto_next_sibling(TSTreeCursor *);
+
+bool ts_diff_tree_cursor_goto_first_child(TSTreeCursor *);
+
 #endif  // TREE_SITTER_TREE_CURSOR_H_

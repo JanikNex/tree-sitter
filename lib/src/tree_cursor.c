@@ -450,3 +450,53 @@ TSTreeCursor ts_tree_cursor_copy(const TSTreeCursor *_cursor) {
   array_push_all(&copy->stack, &cursor->stack);
   return res;
 }
+
+// Functions to traverse all Nodes (including invisble Nodes)
+
+bool ts_diff_tree_cursor_goto_parent(TSTreeCursor *_self){
+  TreeCursor *self = (TreeCursor *)_self;
+  unsigned i = self->stack.size - 1;
+  if (i > 0){
+    self->stack.size = i;
+    return true;
+  }
+  return false;
+}
+
+bool ts_diff_tree_cursor_goto_next_sibling(TSTreeCursor *_self){
+  TreeCursor *self = (TreeCursor *)_self;
+  uint32_t initial_size = self->stack.size;
+
+  if (self->stack.size > 1){
+    TreeCursorEntry entry = array_pop(&self->stack);
+    CursorChildIterator iterator = ts_tree_cursor_iterate_children(self);
+    iterator.child_index = entry.child_index;
+    iterator.structural_child_index = entry.structural_child_index;
+    iterator.position = entry.position;
+
+    bool visible = false;
+    ts_tree_cursor_child_iterator_next(&iterator, &entry, &visible);
+    if (visible && self->stack.size + 1 < initial_size) {
+      self->stack.size = initial_size;
+      return false;
+    }
+    if (ts_tree_cursor_child_iterator_next(&iterator, &entry, &visible)){
+      array_push(&self->stack, entry);
+      return true;
+    }
+  }
+  self->stack.size = initial_size;
+  return false;
+}
+
+bool ts_diff_tree_cursor_goto_first_child(TSTreeCursor *_self){
+  TreeCursor *self = (TreeCursor *)_self;
+  bool visible;
+  TreeCursorEntry entry;
+  CursorChildIterator iterator = ts_tree_cursor_iterate_children(self);
+  if (ts_tree_cursor_child_iterator_next(&iterator, &entry, &visible)) {
+    array_push(&self->stack, entry);
+    return true;
+  }
+  return false;
+}

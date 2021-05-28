@@ -40,6 +40,15 @@ typedef struct {
     Length padding;
 } LiteralEdit;
 
+typedef struct {
+    Subtree parent;
+    const TSTree *tree;
+    Length position;
+    uint32_t child_index;
+    uint32_t structural_child_index;
+    const TSSymbol *alias_sequence;
+} NodeChildIterator;
+
 typedef Array(NodeEntry) NodeEntryArray;
 
 TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
@@ -61,6 +70,10 @@ void unload_unassigned(TSNode, EditScriptBuffer *);
 
 void
 select_available_tree(NodeEntryArray *, const TSTree *, bool, SubtreeRegistry *);
+
+uint32_t ts_real_node_child_count(TSNode);
+
+TSNode ts_real_node_child(TSNode, uint32_t);
 
 static inline void ts_diff_heap_free(TSDiffHeap *self) {
   if (self == NULL) {
