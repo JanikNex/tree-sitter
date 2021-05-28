@@ -46,7 +46,7 @@ ts_tree_diff_graph_node(TSNode self, const TSLanguage *language, FILE *file, uns
   write_dot_string(file, ts_language_symbol_name(language, symbol));
   fprintf(file, "\"");
 
-  if (ts_node_child_count(self) == 0) fprintf(file, ", shape=plaintext");
+  if (ts_real_node_child_count(self) == 0) fprintf(file, ", shape=plaintext");
   if (color == NULL && diff_heap->assigned != NULL) {
     TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*diff_heap->assigned);
     color = find_color(diff_heap, color_table);
@@ -64,8 +64,8 @@ ts_tree_diff_graph_node(TSNode self, const TSLanguage *language, FILE *file, uns
     fprintf(file, ", style=filled, fillcolor=\"#%02hhX%02hhX%02hhX\"", color[0], color[1], color[2]);
   fprintf(file, "]\n");
 
-  for (uint32_t i = 0; i < ts_node_child_count(self); i++) {
-    TSNode child = ts_node_child(self, i);
+  for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
+    TSNode child = ts_real_node_child(self, i);
     ts_tree_diff_graph_node(child, language, file, color, color_table);
     const TSDiffHeap *child_diff_heap = child.diff_heap;
     fprintf(file, "tree_%p -> tree_%p [tooltip=%u]\n", diff_heap->id, child_diff_heap->id, i);

@@ -176,14 +176,14 @@ static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *re
   do {
     subtree = ts_diff_heap_cursor_get_subtree(&cursor);
     ts_subtree_registry_assign_share(registry, subtree);
-    while (ts_tree_cursor_goto_first_child(&cursor)) {
+    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
       lvl++;
       subtree = ts_diff_heap_cursor_get_subtree(&cursor);
       ts_subtree_registry_assign_share(registry, subtree);
     }
-    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
       lvl--;
-      ts_tree_cursor_goto_parent(&cursor);
+      ts_diff_tree_cursor_goto_parent(&cursor);
     }
   } while (lvl > 0);
   ts_tree_cursor_delete(&cursor);
@@ -205,14 +205,14 @@ static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, S
   do {
     subtree = ts_diff_heap_cursor_get_subtree(&cursor);
     ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
-    while (ts_tree_cursor_goto_first_child(&cursor)) {
+    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
       lvl++;
       subtree = ts_diff_heap_cursor_get_subtree(&cursor);
       ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
     }
-    while (!(ts_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
       lvl--;
-      ts_tree_cursor_goto_parent(&cursor);
+      ts_diff_tree_cursor_goto_parent(&cursor);
     }
   } while (lvl > 0);
   ts_tree_cursor_delete(&cursor);

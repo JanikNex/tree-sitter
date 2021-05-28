@@ -8,17 +8,17 @@ typedef struct {
 static void foreach_subtree(TSNode node, SubtreeRegistry *registry, void (*f)(TSNode, SubtreeRegistry *)) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
   int lvl = 0;
-  if (ts_tree_cursor_goto_first_child(&cursor)) {
+  if (ts_diff_tree_cursor_goto_first_child(&cursor)) {
     lvl++;
     f(node, registry);
     while (lvl > 0) {
-      while (ts_tree_cursor_goto_first_child(&cursor)) {
+      while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
         lvl++;
         f(node, registry);
       }
-      while (!ts_tree_cursor_goto_next_sibling(&cursor) && lvl > 0) {
+      while (!ts_diff_tree_cursor_goto_next_sibling(&cursor) && lvl > 0) {
         lvl--;
-        ts_tree_cursor_goto_parent(&cursor);
+        ts_diff_tree_cursor_goto_parent(&cursor);
       }
       if (lvl > 0) {
         f(node, registry);
@@ -42,11 +42,11 @@ static int iterator_first_element(void *const context, void *const value) {
 
 static void deregister_foreach_subtree(TSNode node, SubtreeRegistry *registry) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
-  if (ts_tree_cursor_goto_first_child(&cursor)) {
+  if (ts_diff_tree_cursor_goto_first_child(&cursor)) {
     do {
       TSNode child = ts_tree_cursor_current_node(&cursor);
       ts_subtree_share_deregister_available_tree(child, registry);
-    } while (ts_tree_cursor_goto_next_sibling(&cursor));
+    } while (ts_diff_tree_cursor_goto_next_sibling(&cursor));
   }
   ts_tree_cursor_delete(&cursor);
 }

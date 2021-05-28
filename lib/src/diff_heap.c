@@ -106,18 +106,18 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
   unsigned int tree_height = 0;
   unsigned int tree_size = 0;
   TSDiffHeap *child_heap;
-  if (ts_tree_cursor_goto_first_child(cursor)) {
+  if (ts_diff_tree_cursor_goto_first_child(cursor)) {
     child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
     tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;
     tree_size += child_heap->treesize;
     ts_diff_heap_hash_child(&structural_context, &literal_context, child_heap);
-    while (ts_tree_cursor_goto_next_sibling(cursor)) {
+    while (ts_diff_tree_cursor_goto_next_sibling(cursor)) {
       child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
       tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;
       tree_size += child_heap->treesize;
       ts_diff_heap_hash_child(&structural_context, &literal_context, child_heap);
     }
-    ts_tree_cursor_goto_parent(cursor);
+    ts_diff_tree_cursor_goto_parent(cursor);
   }
   node_diff_heap->treesize = 1 + tree_size;
   node_diff_heap->treeheight = 1 + tree_height;
@@ -139,12 +139,12 @@ static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor) {
   Subtree *subtree = ts_diff_heap_cursor_get_subtree(cursor);
   ts_diff_heap_free(ts_subtree_node_diff_heap(*subtree));
   MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
-  if (ts_tree_cursor_goto_first_child(cursor)) {
+  if (ts_diff_tree_cursor_goto_first_child(cursor)) {
     ts_diff_heap_delete_subtree(cursor);
-    while (ts_tree_cursor_goto_next_sibling(cursor)) {
+    while (ts_diff_tree_cursor_goto_next_sibling(cursor)) {
       ts_diff_heap_delete_subtree(cursor);
     }
-    ts_tree_cursor_goto_parent(cursor);
+    ts_diff_tree_cursor_goto_parent(cursor);
   }
   ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
   *subtree = ts_subtree_from_mut(mut_subtree);
@@ -157,16 +157,16 @@ void ts_diff_heap_delete(const TSTree *tree) {
 }
 
 static bool is_signature_equal(TSNode this_node, TSNode that_node) {
-  uint32_t this_child_count = ts_node_child_count(this_node);
-  uint32_t that_child_count = ts_node_child_count(that_node);
+  uint32_t this_child_count = ts_real_node_child_count(this_node);
+  uint32_t that_child_count = ts_real_node_child_count(that_node);
   if (ts_node_symbol(this_node) != ts_node_symbol(that_node)) return false;
   if (this_child_count != that_child_count) return false;
   if (this_child_count > 0) {
     bool field_eq = true;
     TSTreeCursor this_cursor = ts_tree_cursor_new(this_node);
-    ts_tree_cursor_goto_first_child(&this_cursor);
+    ts_diff_tree_cursor_goto_first_child(&this_cursor);
     TSTreeCursor that_cursor = ts_tree_cursor_new(that_node);
-    ts_tree_cursor_goto_first_child(&that_cursor);
+    ts_diff_tree_cursor_goto_first_child(&that_cursor);
     do {
       TSNode this_kid = ts_tree_cursor_current_node(&this_cursor);
       TSNode that_kid = ts_tree_cursor_current_node(&that_cursor);
@@ -175,7 +175,8 @@ static bool is_signature_equal(TSNode this_node, TSNode that_node) {
         field_eq = false;
         break;
       }
-    } while (ts_tree_cursor_goto_next_sibling(&this_cursor) && ts_tree_cursor_goto_next_sibling(&that_cursor));
+    } while (ts_diff_tree_cursor_goto_next_sibling(&this_cursor) &&
+             ts_diff_tree_cursor_goto_next_sibling(&that_cursor));
     ts_tree_cursor_delete(&this_cursor);
     ts_tree_cursor_delete(&that_cursor);
     return field_eq;
@@ -202,11 +203,11 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
   } else {
     if (is_signature_equal(this_node, that_node)) {
-      uint32_t this_child_count = ts_node_child_count(this_node);
+      uint32_t this_child_count = ts_real_node_child_count(this_node);
       ts_subtree_share_register_available_tree(this_share, this_subtree);
       for (uint32_t i = 0; i < this_child_count; i++) {
-        TSNode this_child = ts_node_child(this_node, i);
-        TSNode that_child = ts_node_child(that_node, i);
+        TSNode this_child = ts_real_node_child(this_node, i);
+        TSNode that_child = ts_real_node_child(that_node, i);
         assign_shares(this_child, that_child, registry);
       }
     } else {
@@ -249,8 +250,8 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
         continue;
       }
       TSNode next_node = ts_diff_heap_node(entry.subtree, that_node.tree);
-      for (uint32_t i = 0; i < ts_node_child_count(next_node); i++) {
-        TSNode child_node = ts_node_child(next_node, i);
+      for (uint32_t i = 0; i < ts_real_node_child_count(next_node); i++) {
+        TSNode child_node = ts_real_node_child(next_node, i);
         Subtree *child_subtree = (Subtree *) child_node.id;
         priority_queue_insert(queue, child_subtree);
       }
@@ -347,17 +348,18 @@ update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const 
     self_child = ts_tree_cursor_current_node(&self_cursor);
     other_child = ts_tree_cursor_current_node(&other_cursor);
     update_literals(self_child, other_child, buffer, self_code, other_code, literal_map, prev_edits);
-    while (ts_tree_cursor_goto_first_child(&self_cursor) && ts_tree_cursor_goto_first_child(&other_cursor)) {
+    while (ts_diff_tree_cursor_goto_first_child(&self_cursor) && ts_diff_tree_cursor_goto_first_child(&other_cursor)) {
       lvl++;
       self_child = ts_tree_cursor_current_node(&self_cursor);
       other_child = ts_tree_cursor_current_node(&other_cursor);
       update_literals(self_child, other_child, buffer, self_code, other_code, literal_map, prev_edits);
     }
-    while (!(ts_tree_cursor_goto_next_sibling(&self_cursor) && ts_tree_cursor_goto_next_sibling(&other_cursor)) &&
-           lvl > 0) {
+    while (
+      !(ts_diff_tree_cursor_goto_next_sibling(&self_cursor) && ts_diff_tree_cursor_goto_next_sibling(&other_cursor)) &&
+      lvl > 0) {
       lvl--;
-      ts_tree_cursor_goto_parent(&self_cursor);
-      ts_tree_cursor_goto_parent(&other_cursor);
+      ts_diff_tree_cursor_goto_parent(&self_cursor);
+      ts_diff_tree_cursor_goto_parent(&other_cursor);
     }
   } while (lvl > 0);
   ts_tree_cursor_delete(&self_cursor);
@@ -378,9 +380,9 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     SHA256_Context structural_context;
     SHA256_Context literal_context;
     ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code);
-    for (uint32_t i = 0; i < ts_node_child_count(self); i++) {
-      TSNode this_kid = ts_node_child(self, i);
-      TSNode that_kid = ts_node_child(other, i);
+    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
+      TSNode this_kid = ts_real_node_child(self, i);
+      TSNode that_kid = ts_real_node_child(other, i);
       Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id, ts_node_symbol(self), i, buffer,
                                                 subtree_pool,
                                                 self_code, other_code, literal_map);
@@ -414,8 +416,8 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
                                 .edit_tag=UNLOAD,
                                 .unload=unload_data
                               }); //TODO: Insert correct Subtree
-    for (uint32_t i = 0; i < ts_node_child_count(self); i++) {
-      TSNode child = ts_node_child(self, i);
+    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
+      TSNode child = ts_real_node_child(self, i);
       unload_unassigned(child, buffer);
     }
   }
@@ -441,11 +443,11 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     .id=new_id,
     .tag=ts_node_symbol(other),
   };
-  if (ts_node_child_count(other) > 0) {
+  if (ts_real_node_child_count(other) > 0) {
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
-    for (uint32_t i = 0; i < ts_node_child_count(other); i++) {
-      TSNode other_kid = ts_node_child(other, i);
+    for (uint32_t i = 0; i < ts_real_node_child_count(other); i++) {
+      TSNode other_kid = ts_real_node_child(other, i);
       Subtree kid_subtree = load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree,
                                             subtree_pool);
       TSDiffHeap *kid_diff_heap = ts_subtree_node_diff_heap(kid_subtree);
