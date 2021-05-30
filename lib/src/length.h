@@ -41,4 +41,11 @@ static inline Length length_zero(void) {
   return result;
 }
 
+static inline bool length_equal(Length len1, Length len2){
+  if (len1.bytes != len2.bytes) return false;
+  if (len1.extent.column != len2.extent.column) return false;
+  if (len1.extent.row != len2.extent.row) return false;
+  return true;
+}
+
 #endif
