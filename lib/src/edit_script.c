@@ -9,9 +9,9 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
     Edit *edit = array_get(&edit_array, i);
     switch (edit->edit_tag) {
       case UPDATE:
-        printf("[UPDATE | %p] Old literal from %d (%d) => New literal from %d (%d)\n", edit->update.id,
-               edit->update.old_start.bytes, edit->update.old_size.bytes, edit->update.new_start.bytes,
-               edit->update.new_size.bytes);
+        printf("[UPDATE | %p] Old literal from %d (%d) [-> %d] => New literal from %d (%d) [-> %d]\n", edit->update.id,
+               edit->update.old_start.bytes, edit->update.old_size.bytes, edit->update.old_padding.bytes,
+               edit->update.new_start.bytes, edit->update.new_size.bytes, edit->update.new_padding.bytes);
         break;
       case LOAD:
         if (edit->load.is_leaf) {

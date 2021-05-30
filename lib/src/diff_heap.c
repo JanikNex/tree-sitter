@@ -297,23 +297,22 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   Length new_size = ts_subtree_size(*other_subtree);
   Length self_padding = ts_subtree_padding(*self_subtree);
   Length other_padding = ts_subtree_padding(*other_subtree);
+  const Length *self_position = &ts_subtree_node_diff_heap(*self_subtree)->position;
+  const Length *other_position = &ts_subtree_node_diff_heap(*other_subtree)->position;
   if (is_literal) {
-    size_t self_literal_len = ts_node_end_byte(self) - ts_node_start_byte(self);
     if (!length_equal(old_size, new_size) || !length_equal(self_padding, other_padding) ||
-        0 != memcmp(((self_code) + ts_node_start_byte(self)),
-                    ((other_code) + ts_node_start_byte(other)),
-                    self_literal_len)) {
-      Length old_start = {.bytes=ts_node_start_byte(self), .extent=ts_node_start_point(self)};
-      Length new_start = {.bytes=ts_node_start_byte(other), .extent=ts_node_start_point(other)};
+        0 != memcmp(((self_code) + self_position->bytes),
+                    ((other_code) + other_position->bytes),
+                    old_size.bytes)) {
       Update update_data = {
         .subtree=self_subtree,
         .id=self.diff_heap->id,
-        .old_start=old_start,
+        .old_start=*self_position,
         .old_size=old_size,
-        .old_padding=ts_subtree_padding(*self_subtree),
-        .new_start=new_start,
+        .old_padding=self_padding,
+        .new_start=*other_position,
         .new_size=new_size,
-        .new_padding=ts_subtree_padding(*other_subtree)
+        .new_padding=other_padding
       };
       ts_edit_script_buffer_add(buffer,
                                 (Edit) {
@@ -335,6 +334,8 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     }
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
+  TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+  self_diff_heap->position = *other_position;
 }
 
 static void
