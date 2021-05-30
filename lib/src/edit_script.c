@@ -126,3 +126,7 @@ void ts_edit_script_delete(EditScript *edit_script) {
   array_delete(&edit_script->edits);
   ts_free(edit_script);
 }
+
+uint32_t ts_edit_script_length(EditScript *edit_script) {
+  return edit_script->edits.size;
+}

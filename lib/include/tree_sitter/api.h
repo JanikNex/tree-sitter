@@ -946,6 +946,9 @@ void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
 
 void ts_edit_script_delete(EditScript *);
 
+void print_edit_script(const TSLanguage *, const EditScript *);
+
+uint32_t ts_edit_script_length(EditScript *);
 /**
  * The following TreeCursor functions should be private but are
  * provided to the api for debugging purposes

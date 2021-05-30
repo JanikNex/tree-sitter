@@ -559,27 +559,25 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
               const TSLiteralMap *literal_map) { //TODO: Cleanup -> free used memory
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
-  printf("Create SubtreeRegistry\n");
+  //printf("Create SubtreeRegistry\n");
   SubtreeRegistry *registry = ts_subtree_registry_create();
-  printf("AssignShares\n");
+  //printf("AssignShares\n");
   assign_shares(self, other, registry);
-  printf("AssignSubtrees\n");
+  //printf("AssignSubtrees\n");
   assign_subtrees(other, registry);
-  printf("Create EditScriptBuffer\n");
+  //printf("Create EditScriptBuffer\n");
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create();
-  printf("Create SubtreePool\n");
+  //printf("Create SubtreePool\n");
   SubtreePool subtree_pool = ts_subtree_pool_new(32);
-  printf("Fill EditScriptBuffer\n");
+  //printf("Fill EditScriptBuffer\n");
   Subtree computed_subtree = compute_edit_script(self, other, NULL, 0, -1, &edit_script_buffer, &subtree_pool,
                                                  self_code, other_code,
                                                  literal_map); // TODO: Look for correct initial parameters!
-  printf("Finalize EditScriptBuffer\n");
+  //printf("Finalize EditScriptBuffer\n");
   EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
-  printf("==== EDIT SCRIPT ====\n");
-  print_edit_script(this_tree->language, edit_script);
-  printf("Balance Subtree\n");
+  //printf("Balance Subtree\n");
   ts_subtree_balance(computed_subtree, &subtree_pool, this_tree->language);
-  printf("Constructing Tree\n");
+  //printf("Constructing Tree\n");
   TSTree *result = ts_tree_new(
     computed_subtree,
     this_tree->language,
