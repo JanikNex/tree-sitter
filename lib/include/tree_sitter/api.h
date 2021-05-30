@@ -140,6 +140,7 @@ typedef enum {
 typedef struct {
     TSTree *constructed_tree;
     EditScript *edit_script;
+    bool success;
 } TSDiffResult;
 
 /********************/
@@ -934,11 +935,28 @@ void ts_literal_map_add_literal(const TSLiteralMap *, uint16_t);
  */
 void ts_literal_map_destroy(TSLiteralMap *);
 
+/**
+ * Compares two Trees and computes their EditScript
+ *
+ * The two trees must be initialized!
+ */
 TSDiffResult ts_compare_to(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *);
 
 void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
 
 void ts_edit_script_delete(EditScript *);
+
+/**
+ * The following TreeCursor functions should be private but are
+ * provided to the api for debugging purposes
+ *  //TODO: Remove when done
+ */
+
+bool ts_diff_tree_cursor_goto_parent(TSTreeCursor *);
+
+bool ts_diff_tree_cursor_goto_next_sibling(TSTreeCursor *);
+
+bool ts_diff_tree_cursor_goto_first_child(TSTreeCursor *);
 
 #ifdef __cplusplus
 }

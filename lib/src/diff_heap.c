@@ -286,59 +286,60 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
   }
 }
 
-static inline LiteralEdit
+static inline void
 update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
-                const TSLiteralMap *literal_map, const LiteralEdit prev_edit) {
-  if (ts_literal_map_is_literal(literal_map, ts_node_symbol(self)) &&
-      ts_literal_map_is_literal(literal_map, ts_node_symbol(other))) {
+                const TSLiteralMap *literal_map) { //TODO: pass updates to parents
+  bool is_literal = ts_literal_map_is_literal(literal_map, ts_node_symbol(self)) &&
+                    ts_literal_map_is_literal(literal_map, ts_node_symbol(other));
+  Subtree *self_subtree = (Subtree *) self.id;
+  Subtree *other_subtree = (Subtree *) other.id;
+  Length old_size = ts_subtree_size(*self_subtree);
+  Length new_size = ts_subtree_size(*other_subtree);
+  Length self_padding = ts_subtree_padding(*self_subtree);
+  Length other_padding = ts_subtree_padding(*other_subtree);
+  if (is_literal) {
     size_t self_literal_len = ts_node_end_byte(self) - ts_node_start_byte(self);
-    size_t other_literal_len = ts_node_end_byte(other) - ts_node_start_byte(other);
-    if (self_literal_len != other_literal_len || (0 != memcmp(((self_code) + ts_node_start_byte(self)),
-                                                              ((other_code) + ts_node_start_byte(other)),
-                                                              self_literal_len))) {
-      Subtree *self_subtree = (Subtree *) self.id;
-      Subtree *other_subtree = (Subtree *) other.id;
+    if (!length_equal(old_size, new_size) || !length_equal(self_padding, other_padding) ||
+        0 != memcmp(((self_code) + ts_node_start_byte(self)),
+                    ((other_code) + ts_node_start_byte(other)),
+                    self_literal_len)) {
       Length old_start = {.bytes=ts_node_start_byte(self), .extent=ts_node_start_point(self)};
-      Length old_size = ts_subtree_size(*self_subtree);
       Length new_start = {.bytes=ts_node_start_byte(other), .extent=ts_node_start_point(other)};
-      Length new_size = ts_subtree_size(*other_subtree);
       Update update_data = {
         .subtree=self_subtree,
         .id=self.diff_heap->id,
         .old_start=old_start,
         .old_size=old_size,
+        .old_padding=ts_subtree_padding(*self_subtree),
         .new_start=new_start,
-        .new_size=new_size
+        .new_size=new_size,
+        .new_padding=ts_subtree_padding(*other_subtree)
       };
       ts_edit_script_buffer_add(buffer,
                                 (Edit) {
                                   .edit_tag=UPDATE,
                                   .update=update_data
                                 });
-      Length padding_change = length_add(prev_edit.padding, length_sub(ts_subtree_padding(*other_subtree),
-                                                                       ts_subtree_padding(*self_subtree)));
-      Length size_change = length_add(prev_edit.size,
-                                      length_sub(ts_subtree_size(*other_subtree), ts_subtree_size(*self_subtree)));
-      MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
-      if (self_subtree->data.is_inline) {
-        mut_subtree.data.padding_bytes += padding_change.bytes;
-        mut_subtree.data.padding_rows += padding_change.extent.row;
-        mut_subtree.data.padding_columns += padding_change.extent.column;
-        mut_subtree.data.size_bytes += size_change.bytes;
-      } else {
-        mut_subtree.ptr->padding = length_add(ts_subtree_padding(*self_subtree), padding_change);
-        mut_subtree.ptr->size = length_add(ts_subtree_size(*self_subtree), size_change);
-      }
-      *self_subtree = ts_subtree_from_mut(mut_subtree);
     }
   }
-  return (LiteralEdit) {.size=length_zero(), .padding=length_zero()}; //TODO: Return correct change
+  if (is_literal || !length_equal(old_size, new_size) || !length_equal(self_padding, other_padding)) {
+    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
+    if (self_subtree->data.is_inline) {
+      mut_subtree.data.padding_bytes = other_padding.bytes;
+      mut_subtree.data.padding_rows = other_padding.extent.row;
+      mut_subtree.data.padding_columns = other_padding.extent.column;
+      mut_subtree.data.size_bytes = new_size.bytes;
+    } else {
+      mut_subtree.ptr->padding = other_padding;
+      mut_subtree.ptr->size = new_size;
+    }
+    *self_subtree = ts_subtree_from_mut(mut_subtree);
+  }
 }
 
 static void
 update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
                      const TSLiteralMap *literal_map) {
-  LiteralEdit prev_edits = (LiteralEdit) {.size=length_zero(), .padding=length_zero()};
   TSTreeCursor self_cursor = ts_tree_cursor_new(self);
   TSTreeCursor other_cursor = ts_tree_cursor_new(other);
   int lvl = 0;
@@ -347,12 +348,12 @@ update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const 
   do { //TODO: Use correct changed offsets
     self_child = ts_tree_cursor_current_node(&self_cursor);
     other_child = ts_tree_cursor_current_node(&other_cursor);
-    update_literals(self_child, other_child, buffer, self_code, other_code, literal_map, prev_edits);
+    update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
     while (ts_diff_tree_cursor_goto_first_child(&self_cursor) && ts_diff_tree_cursor_goto_first_child(&other_cursor)) {
       lvl++;
       self_child = ts_tree_cursor_current_node(&self_cursor);
       other_child = ts_tree_cursor_current_node(&other_cursor);
-      update_literals(self_child, other_child, buffer, self_code, other_code, literal_map, prev_edits);
+      update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
     }
     while (
       !(ts_diff_tree_cursor_goto_next_sibling(&self_cursor) && ts_diff_tree_cursor_goto_next_sibling(&other_cursor)) &&
@@ -486,7 +487,8 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
                                 .edit_tag=LOAD,
                                 .load = load_data
                               });
-    Subtree new_leaf = ts_subtree_new_leaf(subtree_pool, ts_node_symbol(other), ts_subtree_padding(*other_subtree),
+    Subtree new_leaf = ts_subtree_new_leaf(subtree_pool, ts_subtree_symbol(*other_subtree),
+                                           ts_subtree_padding(*other_subtree),
                                            ts_subtree_size(*other_subtree),
                                            ts_subtree_lookahead_bytes(*other_subtree),
                                            ts_subtree_parse_state(*other_subtree),
@@ -584,6 +586,6 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  printf("EQUALITY CHECK: %d\n", ts_subtree_compare(*(Subtree *) other.id, computed_subtree));
-  return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script};
+  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree);
+  return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }

@@ -36,11 +36,6 @@ typedef struct {
 } NodeEntry;
 
 typedef struct {
-    Length size;
-    Length padding;
-} LiteralEdit;
-
-typedef struct {
     Subtree parent;
     const TSTree *tree;
     Length position;

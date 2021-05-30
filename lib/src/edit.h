@@ -68,8 +68,10 @@ typedef struct {
     void *id;
     Length old_start;
     Length old_size;
+    Length old_padding;
     Length new_start;
     Length new_size;
+    Length new_padding;
 } Update;
 
 typedef struct {
