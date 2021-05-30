@@ -586,6 +586,6 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree);
+  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree) == 0;
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
