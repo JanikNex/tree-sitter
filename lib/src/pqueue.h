@@ -21,9 +21,8 @@ void priority_queue_heapify(PriorityQueue *, int);
 
 void priority_queue_destroy(PriorityQueue *);
 
-static inline unsigned int subtree_treeheight(const Subtree *subtree) {
-  const TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  return diff_heap->treeheight;
+static inline bool subtree_compare_dh(const TSDiffHeap *dh1, const TSDiffHeap *dh2) {
+  return dh1->treeheight > dh2->treeheight;
 }
 
 static inline void priority_queue_swap(PriorityQueue *queue, int idx1, int idx2) {

@@ -232,9 +232,9 @@ TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
 void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
   PriorityQueue *queue = priority_queue_create();
   priority_queue_insert(queue, (Subtree *) that_node.id);
+  NodeEntryArray next_nodes = array_new();
   while (!priority_queue_is_empty(queue)) {
     unsigned lvl = priority_queue_head_value(queue);
-    NodeEntryArray next_nodes = array_new(); // TODO: Can we move this out of the loop?
     while (!priority_queue_is_empty(queue) && priority_queue_head_value(queue) == lvl) {
       Subtree *next = priority_queue_pop(queue);
       TSDiffHeap *next_diff_heap = ts_subtree_node_diff_heap(*next);
@@ -256,8 +256,9 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
         priority_queue_insert(queue, child_subtree);
       }
     }
-    array_delete((VoidArray *) &next_nodes);
   }
+  array_delete((VoidArray *) &next_nodes);
+  priority_queue_destroy(queue);
 }
 
 void
@@ -577,7 +578,7 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
   //printf("Finalize EditScriptBuffer\n");
   EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
   //printf("Balance Subtree\n");
-  ts_subtree_balance(computed_subtree, &subtree_pool, this_tree->language);
+  //ts_subtree_balance(computed_subtree, &subtree_pool, this_tree->language); //TODO: No balance needed?
   //printf("Constructing Tree\n");
   TSTree *result = ts_tree_new(
     computed_subtree,
