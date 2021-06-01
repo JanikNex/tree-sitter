@@ -414,6 +414,10 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
       .subtree=self_subtree,
       .tag=ts_node_symbol(self)
     };
+    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
+    ts_diff_heap_free(this_diff_heap);
+    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
+    *self_subtree = ts_subtree_from_mut(mut_subtree);
     ts_edit_script_buffer_add(buffer,
                               (Edit) {
                                 .edit_tag=UNLOAD,
@@ -587,5 +591,8 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
     that_tree->included_range_count
   );
   bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree) == 0;
+  // Cleanup
+  ts_subtree_registry_delete(registry);
+  ts_subtree_pool_delete(&subtree_pool);
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
