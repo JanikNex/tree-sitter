@@ -35,6 +35,8 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
           }
           last_edit->edit_tag = LOAD_ATTACH;
           last_edit->load_attach = la_data;
+        } else {
+          array_push(pos_buff, edit);
         }
       } else {
         array_push(pos_buff, edit);
@@ -62,6 +64,8 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
           };
           last_edit->edit_tag = DETACH_UNLOAD;
           last_edit->detach_unload = du_data;
+        } else {
+          array_push(neg_buff, edit);
         }
       } else {
         array_push(neg_buff, edit);
