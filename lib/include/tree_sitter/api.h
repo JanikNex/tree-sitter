@@ -942,6 +942,13 @@ void ts_literal_map_destroy(TSLiteralMap *);
  */
 TSDiffResult ts_compare_to(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *);
 
+/**
+ * Compares two Trees and computes their EditScript and generates an assignment graph
+ *
+ * The two trees must be initialized!
+ */
+TSDiffResult ts_compare_to_print_graph(const TSTree *, const TSTree *, const char *, const char *, const TSLiteralMap *, FILE *);
+
 void ts_tree_diff_graph(TSNode, TSNode, const TSLanguage *, FILE *);
 
 void ts_edit_script_delete(EditScript *);

@@ -596,3 +596,30 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
   ts_subtree_pool_delete(&subtree_pool);
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
+
+TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *that_tree, const char *self_code, const char *other_code,
+                                       const TSLiteralMap *literal_map, FILE *graph_file){
+  TSNode self = ts_tree_root_node(this_tree);
+  TSNode other = ts_tree_root_node(that_tree);
+  SubtreeRegistry *registry = ts_subtree_registry_create();
+  assign_shares(self, other, registry);
+  assign_subtrees(other, registry);
+  ts_tree_diff_graph(self, other, this_tree->language, graph_file);
+  EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create();
+  SubtreePool subtree_pool = ts_subtree_pool_new(32);
+  Subtree computed_subtree = compute_edit_script(self, other, NULL, 0, -1, &edit_script_buffer, &subtree_pool,
+                                                 self_code, other_code,
+                                                 literal_map); // TODO: Look for correct initial parameters!
+  EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
+  TSTree *result = ts_tree_new(
+    computed_subtree,
+    this_tree->language,
+    that_tree->included_ranges, // TODO: Calculate values
+    that_tree->included_range_count
+  );
+  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree) == 0;
+  // Cleanup
+  ts_subtree_registry_delete(registry);
+  ts_subtree_pool_delete(&subtree_pool);
+  return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
+}
