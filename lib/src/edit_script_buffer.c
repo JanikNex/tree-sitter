@@ -6,7 +6,7 @@ EditScriptBuffer ts_edit_script_buffer_create() {
   return (EditScriptBuffer) {.negative_buffer = array_new(), .positive_buffer=array_new()};
 }
 
-void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
+void ts_edit_script_buffer_add(EditScriptBuffer *buffer, SugaredEdit edit) {
   EditArray *pos_buff = &buffer->positive_buffer;
   EditArray *neg_buff = &buffer->negative_buffer;
   switch (edit.edit_tag) {
@@ -18,7 +18,7 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
     case ATTACH:
 #ifdef ADVANCED_EDITS
       if (pos_buff->size > 0) {
-        Edit *last_edit = array_back(pos_buff);
+        SugaredEdit *last_edit = array_back(pos_buff);
         if (last_edit->edit_tag == LOAD && last_edit->load.id == edit.attach.id) {
           LoadAttach la_data = (LoadAttach) {
             .id=last_edit->load.id,
@@ -52,7 +52,7 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, Edit edit) {
     case UNLOAD:
 #ifdef ADVANCED_EDITS
       if (neg_buff->size > 0) {
-        Edit *last_edit = array_back(neg_buff);
+        SugaredEdit *last_edit = array_back(neg_buff);
         if (last_edit->edit_tag == DETACH && last_edit->detach.subtree == edit.unload.subtree) {
           DetachUnload du_data = {
             .id=last_edit->detach.id,

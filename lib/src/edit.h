@@ -118,9 +118,9 @@ typedef struct {
         LoadAttach load_attach;
         DetachUnload detach_unload;
     };
-} Edit;
+} SugaredEdit;
 
-typedef Array(Edit) EditArray;
+typedef Array(SugaredEdit) EditArray;
 typedef Array(CoreEdit) CoreEditArray;
 
 #endif //TREE_SITTER_EDIT_H

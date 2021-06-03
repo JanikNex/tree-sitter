@@ -14,7 +14,7 @@ typedef struct {
 
 EditScriptBuffer ts_edit_script_buffer_create();
 
-void ts_edit_script_buffer_add(EditScriptBuffer *, Edit);
+void ts_edit_script_buffer_add(EditScriptBuffer *, SugaredEdit);
 
 EditScript *ts_edit_script_buffer_finalize(EditScriptBuffer *);
 

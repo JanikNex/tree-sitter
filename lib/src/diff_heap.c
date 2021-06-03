@@ -316,7 +316,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
         .new_padding=other_padding
       };
       ts_edit_script_buffer_add(buffer,
-                                (Edit) {
+                                (SugaredEdit) {
                                   .edit_tag=UPDATE,
                                   .update=update_data
                                 });
@@ -419,7 +419,7 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
     ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
     *self_subtree = ts_subtree_from_mut(mut_subtree);
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {
+                              (SugaredEdit) {
                                 .edit_tag=UNLOAD,
                                 .unload=unload_data
                               }); //TODO: Insert correct Subtree
@@ -471,7 +471,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     EditNodeData node_data = {.kids=child_prototypes, .production_id=ts_subtree_production_id(*other_subtree)};
     load_data.node = node_data;
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {
+                              (SugaredEdit) {
                                 .edit_tag=LOAD,
                                 .load=load_data
                               });
@@ -489,7 +489,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     };
     load_data.leaf = leaf_data;
     ts_edit_script_buffer_add(buffer,
-                              (Edit) {
+                              (SugaredEdit) {
                                 .edit_tag=LOAD,
                                 .load = load_data
                               });
@@ -538,7 +538,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
     .parent_tag=parent_type
   };
   ts_edit_script_buffer_add(buffer,
-                            (Edit) {
+                            (SugaredEdit) {
                               .edit_tag=DETACH,
                               .detach=detach_data
                             });
@@ -552,7 +552,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
     .parent_id=parent_id
   };
   ts_edit_script_buffer_add(buffer,
-                            (Edit) {
+                            (SugaredEdit) {
                               .edit_tag=ATTACH,
                               .attach=attach_data
                             });
@@ -597,8 +597,9 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
 
-TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *that_tree, const char *self_code, const char *other_code,
-                                       const TSLiteralMap *literal_map, FILE *graph_file){
+TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *that_tree, const char *self_code,
+                                       const char *other_code,
+                                       const TSLiteralMap *literal_map, FILE *graph_file) {
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
   SubtreeRegistry *registry = ts_subtree_registry_create();

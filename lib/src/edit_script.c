@@ -6,7 +6,7 @@
 void print_edit_script(const TSLanguage *language, const EditScript *edit_script) {
   const EditArray edit_array = edit_script->edits;
   for (uint32_t i = 0; i < edit_array.size; i++) {
-    Edit *edit = array_get(&edit_array, i);
+    SugaredEdit *edit = array_get(&edit_array, i);
     switch (edit->edit_tag) {
       case UPDATE:
         printf("[UPDATE | %p] Old literal from %d (%d) [-> %d] => New literal from %d (%d) [-> %d]\n", edit->update.id,
@@ -71,7 +71,7 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
   }
 }
 
-CoreEditArray edit_as_core_edit(Edit edit) {
+CoreEditArray edit_as_core_edit(SugaredEdit edit) {
   CoreEditArray result = array_new();
   CoreEdit ce1;
   switch (edit.edit_tag) {
