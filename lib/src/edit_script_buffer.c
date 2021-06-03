@@ -53,14 +53,14 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, SugaredEdit edit) {
 #ifdef ADVANCED_EDITS
       if (neg_buff->size > 0) {
         SugaredEdit *last_edit = array_back(neg_buff);
-        if (last_edit->edit_tag == DETACH && last_edit->detach.subtree == edit.unload.subtree) {
+        if (last_edit->edit_tag == DETACH && last_edit->detach.id == edit.unload.id) {
           DetachUnload du_data = {
             .id=last_edit->detach.id,
-            .subtree=last_edit->detach.subtree,
             .tag=edit.unload.tag,
             .parent_tag=last_edit->detach.parent_tag,
             .parent_id=last_edit->detach.parent_id,
-            .link=last_edit->detach.link
+            .link=last_edit->detach.link,
+            .kids = edit.unload.kids
           };
           last_edit->edit_tag = DETACH_UNLOAD;
           last_edit->detach_unload = du_data;

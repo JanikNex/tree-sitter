@@ -15,10 +15,10 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         break;
       case LOAD:
         if (edit->load.is_leaf) {
-          printf("[LOAD | >%p<] Load new leaf of type \"%s\"\n", edit->load.id,
+          printf("[LOAD | %p] Load new leaf of type \"%s\"\n", edit->load.id,
                  ts_language_symbol_name(language, edit->load.tag));
         } else {
-          printf("[LOAD | >%p<] Load new subtree of type \"%s\" with kids [", edit->load.id,
+          printf("[LOAD | %p] Load new subtree of type \"%s\" with kids [", edit->load.id,
                  ts_language_symbol_name(language, edit->load.tag));
           for (uint32_t j = 0; j < edit->load.node.kids.size; j++) {
             ChildPrototype *prototype = array_get(&edit->load.node.kids, j);
@@ -36,12 +36,12 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         break;
       case LOAD_ATTACH:
         if (edit->load_attach.is_leaf) {
-          printf("[LOAD_ATTACH | >%p<] Load new leaf of type \"%s\" and attach to parent %p of type %s on link %d\n",
+          printf("[LOAD_ATTACH | %p] Load new leaf of type \"%s\" and attach to parent %p of type %s on link %d\n",
                  edit->load_attach.id,
                  ts_language_symbol_name(language, edit->load_attach.tag), edit->load_attach.parent_id,
                  ts_language_symbol_name(language, edit->load_attach.parent_tag), edit->load_attach.link);
         } else {
-          printf("[LOAD_ATTACH | >%p<] Load new subtree of type \"%s\" with kids [", edit->load_attach.id,
+          printf("[LOAD_ATTACH | %p] Load new subtree of type \"%s\" with kids [", edit->load_attach.id,
                  ts_language_symbol_name(language, edit->load_attach.tag));
           EditNodeData *node_data = &edit->load_attach.node;
           for (uint32_t j = 0; j < node_data->kids.size; j++) {
@@ -60,12 +60,38 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
                ts_language_symbol_name(language, edit->detach.parent_tag), edit->detach.link);
         break;
       case UNLOAD:
-        printf("[UNLOAD | \"%p\"] %s\n", edit->unload.id, ts_language_symbol_name(language, edit->unload.tag));
+        printf("[UNLOAD | %p] %s", edit->unload.id, ts_language_symbol_name(language, edit->unload.tag));
+        if (edit->unload.kids.size > 0) {
+          printf(" and set its kids free [");
+          ChildPrototypeArray kids = edit->unload.kids;
+          for (uint32_t j = 0; j < kids.size; j++) {
+            ChildPrototype *prototype = array_get(&kids, j);
+            if (j > 0) {
+              printf(", ");
+            }
+            printf("%p", prototype->child_id);
+          }
+          printf("]");
+        }
+        printf("\n");
         break;
       case DETACH_UNLOAD:
-        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d\n", edit->detach_unload.id,
+        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d", edit->detach_unload.id,
                edit->detach_unload.parent_id, ts_language_symbol_name(language, edit->detach_unload.parent_tag),
                edit->detach_unload.link);
+        if (edit->detach_unload.kids.size > 0) {
+          printf(" and set its kids free [");
+          ChildPrototypeArray kids = edit->detach_unload.kids;
+          for (uint32_t j = 0; j < kids.size; j++) {
+            ChildPrototype *prototype = array_get(&kids, j);
+            if (j > 0) {
+              printf(", ");
+            }
+            printf("%p", prototype->child_id);
+          }
+          printf("]");
+        }
+        printf("\n");
         break;
     }
   }
@@ -94,7 +120,7 @@ CoreEditArray edit_as_core_edit(SugaredEdit edit) {
       } else {
         load_data.node = edit.load_attach.node;
       }
-      Attach attach_data = {.id=edit.load_attach.id, .link=edit.load_attach.link, .parent_id=edit.load_attach.parent_id, .parent_tag=edit.load_attach.parent_tag};
+      Attach attach_data = {.id=edit.load_attach.id, .tag=edit.load_attach.tag, .link=edit.load_attach.link, .parent_id=edit.load_attach.parent_id, .parent_tag=edit.load_attach.parent_tag};
       ce1 = (CoreEdit) {.edit_tag=CORE_LOAD, .load=load_data};
       array_push(&result, ce1);
       CoreEdit ce2 = (CoreEdit) {.edit_tag=CORE_ATTACH, .attach=attach_data};
@@ -110,8 +136,8 @@ CoreEditArray edit_as_core_edit(SugaredEdit edit) {
       array_push(&result, ce1);
       break;
     case DETACH_UNLOAD: {
-      Detach detach_data = {.id=edit.detach_unload.id, .subtree=edit.detach_unload.subtree, .link=edit.detach_unload.link, .parent_tag=edit.detach_unload.parent_tag, .parent_id=edit.detach_unload.parent_id};
-      Unload unload_data = {.id=edit.detach_unload.id, .subtree=edit.detach_unload.subtree, .tag=edit.detach_unload.tag};
+      Detach detach_data = {.id=edit.detach_unload.id, .tag=edit.detach_unload.tag, .link=edit.detach_unload.link, .parent_tag=edit.detach_unload.parent_tag, .parent_id=edit.detach_unload.parent_id};
+      Unload unload_data = {.id=edit.detach_unload.id, .tag=edit.detach_unload.tag, .kids=edit.detach_unload.kids};
       ce1 = (CoreEdit) {.edit_tag=CORE_DETACH, .detach=detach_data};
       array_push(&result, ce1);
       CoreEdit ce2 = (CoreEdit) {.edit_tag=CORE_UNLOAD, .unload=unload_data};

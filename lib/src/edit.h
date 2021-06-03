@@ -34,14 +34,15 @@ typedef enum {
 
 typedef struct {
     void *id;
+    TSSymbol tag;
     uint32_t link;
     void *parent_id;
     TSSymbol parent_tag;
 } Attach;
 
 typedef struct {
-    Subtree *subtree;
     void *id;
+    TSSymbol tag;
     uint32_t link;
     void *parent_id;
     TSSymbol parent_tag;
@@ -49,8 +50,8 @@ typedef struct {
 
 typedef struct {
     TSSymbol tag;
-    Subtree *subtree;
     void *id;
+    ChildPrototypeArray kids;
 } Unload;
 
 typedef struct {
@@ -64,8 +65,8 @@ typedef struct {
 } Load;
 
 typedef struct {
-    Subtree *subtree;
     void *id;
+    TSSymbol tag;
     Length old_start;
     Length old_size;
     Length old_padding;
@@ -88,12 +89,12 @@ typedef struct {
 } LoadAttach;
 
 typedef struct {
-    Subtree *subtree;
     void *id;
     uint32_t link;
     void *parent_id;
     TSSymbol parent_tag;
     TSSymbol tag;
+    ChildPrototypeArray kids;
 } DetachUnload;
 
 typedef struct {

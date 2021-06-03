@@ -306,8 +306,8 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
                     ((other_code) + other_position->bytes),
                     old_size.bytes)) {
       Update update_data = {
-        .subtree=self_subtree,
         .id=self.diff_heap->id,
+        .tag=ts_subtree_symbol(*self_subtree),
         .old_start=*self_position,
         .old_size=old_size,
         .old_padding=self_padding,
@@ -411,22 +411,25 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   } else {
     Unload unload_data = {
       .id=this_diff_heap->id,
-      .subtree=self_subtree,
       .tag=ts_node_symbol(self)
     };
     MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
     ts_diff_heap_free(this_diff_heap);
     ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
     *self_subtree = ts_subtree_from_mut(mut_subtree);
+    ChildPrototypeArray child_prototypes = array_new();
+    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
+      TSNode child = ts_real_node_child(self, i);
+      const TSDiffHeap *child_diff_heap = child.diff_heap;
+      array_push(&child_prototypes, (ChildPrototype) {.child_id=child_diff_heap->id});
+      unload_unassigned(child, buffer);
+    }
+    unload_data.kids = child_prototypes;
     ts_edit_script_buffer_add(buffer,
                               (SugaredEdit) {
                                 .edit_tag=UNLOAD,
                                 .unload=unload_data
-                              }); //TODO: Insert correct Subtree
-    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
-      TSNode child = ts_real_node_child(self, i);
-      unload_unassigned(child, buffer);
-    }
+                              });
   }
 }
 
@@ -532,7 +535,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
   }
   Detach detach_data = {
     .id=this_diff_heap->id,
-    .subtree=this_subtree,
+    .tag=ts_subtree_symbol(*this_subtree),
     .link=link,
     .parent_id=parent_id,
     .parent_tag=parent_type
@@ -547,6 +550,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
   TSDiffHeap *new_subtree_diff_heap = ts_subtree_node_diff_heap(new_subtree);
   Attach attach_data = {
     .id=new_subtree_diff_heap->id,
+    .tag=ts_subtree_symbol(new_subtree),
     .link=link,
     .parent_tag=parent_type,
     .parent_id=parent_id
