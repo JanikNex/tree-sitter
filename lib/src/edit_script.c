@@ -56,11 +56,13 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         }
         break;
       case DETACH:
-        printf("[DETACH | %p] From parent %p of type \"%s\" on link %d\n", edit->detach.id, edit->detach.parent_id,
+        printf("[DETACH | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d\n", edit->detach.id,
+               ts_language_symbol_name(language, edit->detach.tag), edit->detach.parent_id,
                ts_language_symbol_name(language, edit->detach.parent_tag), edit->detach.link);
         break;
       case UNLOAD:
-        printf("[UNLOAD | %p] %s", edit->unload.id, ts_language_symbol_name(language, edit->unload.tag));
+        printf("[UNLOAD | %p] Node of type \"%s\"", edit->unload.id,
+               ts_language_symbol_name(language, edit->unload.tag));
         if (edit->unload.kids.size > 0) {
           printf(" and set its kids free [");
           ChildPrototypeArray kids = edit->unload.kids;
@@ -76,7 +78,9 @@ void print_edit_script(const TSLanguage *language, const EditScript *edit_script
         printf("\n");
         break;
       case DETACH_UNLOAD:
-        printf("[DETACH_UNLOAD | %p] from parent %p of type \"%s\" on link %d", edit->detach_unload.id,
+        printf("[DETACH_UNLOAD | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d",
+               edit->detach_unload.id,
+               ts_language_symbol_name(language, edit->detach_unload.tag),
                edit->detach_unload.parent_id, ts_language_symbol_name(language, edit->detach_unload.parent_tag),
                edit->detach_unload.link);
         if (edit->detach_unload.kids.size > 0) {
