@@ -955,6 +955,8 @@ void ts_edit_script_delete(EditScript *);
 
 void print_edit_script(const TSLanguage *, const EditScript *);
 
+void print_minimized_edit_script(const TSLanguage *, const EditScript *);
+
 uint32_t ts_edit_script_length(EditScript *);
 /**
  * The following TreeCursor functions should be private but are
