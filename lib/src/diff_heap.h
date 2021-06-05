@@ -20,6 +20,7 @@ extern "C" {
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
 struct TSDiffHeap {
     void *id;
+    volatile uint32_t ref_count;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
     const unsigned char literal_hash[SHA256_HASH_SIZE];
     unsigned int treeheight;
@@ -70,13 +71,6 @@ uint32_t ts_real_node_child_count(TSNode);
 
 TSNode ts_real_node_child(TSNode, uint32_t);
 
-static inline void ts_diff_heap_free(TSDiffHeap *self) {
-  if (self == NULL) {
-    return;
-  }
-  ts_free(self->id);
-  ts_free(self);
-}
 
 static inline void *generate_new_id() { // TODO: Is there a better way to generate URIs?
   return ts_malloc(1);
@@ -89,6 +83,7 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   node_diff_heap->share = NULL;
   node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
+  node_diff_heap->ref_count = 1;
   return node_diff_heap;
 }
 
@@ -99,6 +94,7 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
   node_diff_heap->share = NULL;
   node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
+  node_diff_heap->ref_count = 1;
   return node_diff_heap;
 }
 

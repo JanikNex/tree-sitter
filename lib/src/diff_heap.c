@@ -90,6 +90,21 @@ uint32_t ts_real_node_child_count(TSNode self) {
   }
 }
 
+/**
+ *  DiffHeap reference counting
+ */
+
+void diff_heap_inc(TSDiffHeap *diff_heap) {
+  assert(diff_heap->ref_count > 0);
+  atomic_inc((volatile uint32_t *) &diff_heap->ref_count);
+  assert(diff_heap->ref_count != 0);
+}
+
+uint32_t diff_heap_dec(TSDiffHeap *diff_heap) {
+  assert(diff_heap->ref_count > 0);
+  return atomic_dec((volatile uint32_t *) &diff_heap->ref_count);
+}
+
 bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2) {
   return memcmp(hash1, hash2, SHA256_HASH_SIZE) == 0;
 }
@@ -139,8 +154,14 @@ void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiter
 
 static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor) {
   Subtree *subtree = ts_diff_heap_cursor_get_subtree(cursor);
-  ts_diff_heap_free(ts_subtree_node_diff_heap(*subtree));
-  MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  if (diff_heap != NULL && diff_heap_dec(diff_heap) == 0) {
+    ts_free(diff_heap->id);
+    ts_free(diff_heap);
+    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
+    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
+    *subtree = ts_subtree_from_mut(mut_subtree);
+  }
   if (ts_diff_tree_cursor_goto_first_child(cursor)) {
     ts_diff_heap_delete_subtree(cursor);
     while (ts_diff_tree_cursor_goto_next_sibling(cursor)) {
@@ -148,8 +169,6 @@ static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor) {
     }
     ts_diff_tree_cursor_goto_parent(cursor);
   }
-  ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
-  *subtree = ts_subtree_from_mut(mut_subtree);
 }
 
 void ts_diff_heap_delete(const TSTree *tree) {
@@ -339,6 +358,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   }
   TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   self_diff_heap->position = *other_position;
+  diff_heap_inc(self_diff_heap);
 }
 
 static void
@@ -377,18 +397,21 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
                                     const char *other_code,
                                     const TSLiteralMap *literal_map) {
   if (is_signature_equal(self, other)) {
+    Subtree *self_subtree = (Subtree *) self.id;
     Subtree *other_subtree = (Subtree *) other.id;
-    const TSDiffHeap *this_diff_heap = self.diff_heap;
+    TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
     SubtreeArray subtree_array = array_new();
-    Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
-    TSDiffHeap *new_node_diff_heap = ts_diff_heap_new_with_id(node_position, this_diff_heap->id);
+    //Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
+    TSDiffHeap *new_node_diff_heap = this_diff_heap;
+    diff_heap_inc(new_node_diff_heap);
     SHA256_Context structural_context;
     SHA256_Context literal_context;
     ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code);
     for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
       TSNode this_kid = ts_real_node_child(self, i);
       TSNode that_kid = ts_real_node_child(other, i);
-      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id, ts_node_symbol(self), i, buffer,
+      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, new_node_diff_heap->id, ts_node_symbol(self), i,
+                                                buffer,
                                                 subtree_pool,
                                                 self_code, other_code, literal_map);
       ts_diff_heap_hash_child(&structural_context, &literal_context, ts_subtree_node_diff_heap(kid_subtree));
@@ -415,16 +438,11 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
       .id=this_diff_heap->id,
       .tag=ts_node_symbol(self)
     };
-    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
-    ts_diff_heap_free(this_diff_heap);
-    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
-    *self_subtree = ts_subtree_from_mut(mut_subtree);
     ChildPrototypeArray child_prototypes = array_new();
     for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
       TSNode child = ts_real_node_child(self, i);
       const TSDiffHeap *child_diff_heap = child.diff_heap;
       array_push(&child_prototypes, (ChildPrototype) {.child_id=child_diff_heap->id});
-      unload_unassigned(child, buffer);
     }
     unload_data.kids = child_prototypes;
     ts_edit_script_buffer_add(buffer,
@@ -432,6 +450,10 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
                                 .edit_tag=UNLOAD,
                                 .unload=unload_data
                               });
+    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
+      TSNode child = ts_real_node_child(self, i);
+      unload_unassigned(child, buffer);
+    }
   }
 }
 
@@ -443,6 +465,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     const Subtree *assigned_subtree = other_diff_heap->assigned;
     TSNode assigned_node = ts_diff_heap_node(assigned_subtree, self_tree);
     update_literals_iter(assigned_node, other, buffer, self_code, other_code, literal_map);
+    ts_subtree_retain(*assigned_subtree);
     return *assigned_subtree;
   }
   void *new_id = generate_new_id();
@@ -526,6 +549,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
   if (this_diff_heap->assigned != NULL && ts_subtree_node_diff_heap(*assigned_to_this)->id == other_diff_heap->id) {
     // self == other
     update_literals_iter(self, other, buffer, self_code, other_code, literal_map);
+    ts_subtree_retain(*this_subtree);
     return *this_subtree; //TODO: Insert updated subtree
   } else if (this_diff_heap->assigned == NULL && other_diff_heap->assigned == NULL) {
     // No match -> recurse into
