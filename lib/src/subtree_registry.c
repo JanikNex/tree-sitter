@@ -14,6 +14,19 @@ void ts_subtree_registry_delete(SubtreeRegistry *self) {
   ts_free(self);
 }
 
+void ts_subtree_registry_clean_delete(SubtreeRegistry *self) {
+  raxIterator iter;
+  raxStart(&iter, self->subtrees); // Note that 'rt' is the radix tree pointer.
+  raxSeek(&iter, "^", NULL, 0);
+  while (raxNext(&iter)) {
+    SubtreeShare *share = (SubtreeShare *) iter.data;
+    ts_subtree_share_delete(share);
+  }
+  raxStop(&iter);
+  raxFree(self->subtrees);
+  ts_free(self);
+}
+
 SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *self, Subtree *subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (diff_heap->skip_node) {

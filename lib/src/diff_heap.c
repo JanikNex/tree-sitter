@@ -1,3 +1,4 @@
+#include <printf.h>
 #include "sha_digest/sha256.h"
 #include "diff_heap.h"
 #include "tree.h"
@@ -5,6 +6,7 @@
 #include "pqueue.h"
 #include "edit_script_buffer.h"
 #include "language.h"
+#include "atomic.h"
 
 /**
  * NodeChildInterator
@@ -594,9 +596,9 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree) == 0;
+  bool success = ts_subtree_eq(*(Subtree *) other.id, computed_subtree) == 0;
   // Cleanup
-  ts_subtree_registry_delete(registry);
+  ts_subtree_registry_clean_delete(registry);
   ts_subtree_pool_delete(&subtree_pool);
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
@@ -622,9 +624,9 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  bool success = ts_subtree_compare(*(Subtree *) other.id, computed_subtree) == 0;
+  bool success = ts_subtree_eq(*(Subtree *) other.id, computed_subtree) == 0;
   // Cleanup
-  ts_subtree_registry_delete(registry);
+  ts_subtree_registry_clean_delete(registry);
   ts_subtree_pool_delete(&subtree_pool);
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }

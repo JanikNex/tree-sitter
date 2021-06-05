@@ -18,6 +18,8 @@ SubtreeRegistry *ts_subtree_registry_create();
 
 void ts_subtree_registry_delete(SubtreeRegistry *);
 
+void ts_subtree_registry_clean_delete(SubtreeRegistry *);
+
 SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *, Subtree *);
 
 SubtreeShare *ts_subtree_registry_assign_share_and_register_tree(const SubtreeRegistry *, Subtree *);

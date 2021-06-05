@@ -153,6 +153,29 @@ CoreEditArray edit_as_core_edit(SugaredEdit edit) {
 }
 
 void ts_edit_script_delete(EditScript *edit_script) {
+  for (uint32_t i = 0; i < edit_script->edits.size; ++i) {
+    SugaredEdit *edit = array_get(&edit_script->edits, i);
+    switch (edit->edit_tag) {
+      case UNLOAD:
+        array_delete(&edit->unload.kids);
+        break;
+      case DETACH_UNLOAD:
+        array_delete(&edit->detach_unload.kids);
+        break;
+      case LOAD:
+        if (!edit->load.is_leaf){
+          array_delete(&edit->load.node.kids);
+        }
+        break;
+      case LOAD_ATTACH:
+        if (!edit->load_attach.is_leaf){
+          array_delete(&edit->load_attach.node.kids);
+        }
+        break;
+      default:
+        break;
+    }
+  }
   array_delete(&edit_script->edits);
   ts_free(edit_script);
 }
