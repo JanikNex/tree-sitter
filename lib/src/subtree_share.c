@@ -62,7 +62,7 @@ static void take_tree_assign_foreach(TSNode node, SubtreeRegistry *registry) {
 static Subtree *take_tree(const SubtreeShare *self, TSNode tree, TSNode that, SubtreeRegistry *registry) {
   TSDiffHeap *diff_heap = (TSDiffHeap *) tree.diff_heap;
   SubtreeShare *share = diff_heap->share;
-  hashmap_remove(self->available_trees, diff_heap->id, sizeof(diff_heap->id));
+  hashmap_remove(self->available_trees, (char *) &diff_heap->id, sizeof(void *));
   if (share->_preferred_trees != NULL) {
     raxRemove(share->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
               NULL);
@@ -97,7 +97,7 @@ void ts_subtree_share_delete(SubtreeShare *self) {
 void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree *subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (!diff_heap->skip_node) {
-    hashmap_put(self->available_trees, diff_heap->id, sizeof(diff_heap->id), subtree);
+    hashmap_put(self->available_trees, (char *) &diff_heap->id, sizeof(void *), subtree);
     if (self->_preferred_trees != NULL) {
       raxInsert(self->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
                 subtree, NULL);
@@ -144,7 +144,7 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
   TSDiffHeap *diff_heap = (TSDiffHeap *) node.diff_heap;
   if (diff_heap->share != NULL) {
     SubtreeShare *share = diff_heap->share;
-    hashmap_remove(share->available_trees, diff_heap->id, sizeof(diff_heap->id));
+    hashmap_remove(share->available_trees, (char *) &diff_heap->id, sizeof(void *));
     share = NULL;
     deregister_foreach_subtree(node, registry);
   } else if (diff_heap->assigned != NULL) {

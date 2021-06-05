@@ -110,14 +110,13 @@ ts_diff_heap_hash_init(SHA256_Context *structural_context, SHA256_Context *liter
     fprintf(stderr, "SHA_digest library failure at initialize\n");
     return;
   }
+  const TSSymbol symbol = ts_node_symbol(*node);
   // Hash node type in structural hash
-  const char *tag = ts_node_type(*node);
-  if (sha256_add_bytes(structural_context, tag, strlen(tag)) != SHA_DIGEST_OK) {
+  if (sha256_add_bytes(structural_context, &symbol, sizeof(symbol)) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");
     return;
   }
   // Hash literal in literal hash if necessary
-  TSSymbol symbol = ts_node_symbol(*node);
   if (ts_literal_map_is_literal(literal_map, symbol)) {
     size_t literal_len = ts_node_end_byte(*node) - ts_node_start_byte(*node);
     if (sha256_add_bytes(literal_context, ((const void *) code) + ts_node_start_byte(*node), literal_len) !=

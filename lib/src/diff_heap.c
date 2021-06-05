@@ -255,8 +255,11 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
   priority_queue_insert(queue, (Subtree *) that_node.id);
   NodeEntryArray next_nodes = array_new();
   while (!priority_queue_is_empty(queue)) {
-    unsigned lvl = priority_queue_head_value(queue);
-    while (!priority_queue_is_empty(queue) && priority_queue_head_value(queue) == lvl) {
+    unsigned int lvl = priority_queue_head_value(queue);
+    while (!priority_queue_is_empty(queue)) {
+      if (priority_queue_head_value(queue) != lvl) {
+        break;
+      }
       Subtree *next = priority_queue_pop(queue);
       TSDiffHeap *next_diff_heap = ts_subtree_node_diff_heap(*next);
       if (next_diff_heap->assigned == NULL) {
