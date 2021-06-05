@@ -400,27 +400,25 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     Subtree *self_subtree = (Subtree *) self.id;
     Subtree *other_subtree = (Subtree *) other.id;
     TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+    diff_heap_inc(this_diff_heap);
     SubtreeArray subtree_array = array_new();
-    //Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
-    TSDiffHeap *new_node_diff_heap = this_diff_heap;
-    diff_heap_inc(new_node_diff_heap);
     SHA256_Context structural_context;
     SHA256_Context literal_context;
     ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code);
     for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
       TSNode this_kid = ts_real_node_child(self, i);
       TSNode that_kid = ts_real_node_child(other, i);
-      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, new_node_diff_heap->id, ts_node_symbol(self), i,
+      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id, ts_node_symbol(self), i,
                                                 buffer,
                                                 subtree_pool,
                                                 self_code, other_code, literal_map);
       ts_diff_heap_hash_child(&structural_context, &literal_context, ts_subtree_node_diff_heap(kid_subtree));
       array_push(&subtree_array, kid_subtree);
     }
-    ts_diff_heap_hash_finalize(&structural_context, &literal_context, new_node_diff_heap);
+    ts_diff_heap_hash_finalize(&structural_context, &literal_context, this_diff_heap);
     MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &subtree_array,
                                                   ts_subtree_production_id(*other_subtree), self.tree->language);
-    ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap);
+    ts_subtree_assign_node_diff_heap(&mut_node, this_diff_heap);
     Subtree new_node = ts_subtree_from_mut(mut_node);
     return new_node;
   } else {
