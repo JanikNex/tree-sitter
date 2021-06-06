@@ -16,7 +16,7 @@ void ts_subtree_registry_delete(SubtreeRegistry *self) {
 
 void ts_subtree_registry_clean_delete(SubtreeRegistry *self) {
   raxIterator iter;
-  raxStart(&iter, self->subtrees); // Note that 'rt' is the radix tree pointer.
+  raxStart(&iter, self->subtrees);
   raxSeek(&iter, "^", NULL, 0);
   while (raxNext(&iter)) {
     SubtreeShare *share = (SubtreeShare *) iter.data;

@@ -8,30 +8,27 @@ typedef struct {
 static void foreach_subtree(TSNode node, SubtreeRegistry *registry, void (*f)(TSNode, SubtreeRegistry *)) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
   int lvl = 0;
-  if (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-    lvl++;
-    f(node, registry);
-    while (lvl > 0) {
-      while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-        lvl++;
-        f(node, registry);
-      }
-      while (!ts_diff_tree_cursor_goto_next_sibling(&cursor) && lvl > 0) {
-        lvl--;
-        ts_diff_tree_cursor_goto_parent(&cursor);
-      }
-      if (lvl > 0) {
-        f(node, registry);
-      }
+  TSNode curr;
+  do {
+    curr = ts_tree_cursor_current_node(&cursor);
+    f(curr, registry);
+    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
+      lvl++;
+      curr = ts_tree_cursor_current_node(&cursor);
+      f(curr, registry);
     }
-  }
+    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
+      lvl--;
+      ts_diff_tree_cursor_goto_parent(&cursor);
+    }
+  } while (lvl > 0);
   ts_tree_cursor_delete(&cursor);
 }
 
 static int iterator_preferred_trees_init(void *const context, void *const value) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*(Subtree *) value);
   rax *pref_trees = (rax *) context;
-  raxInsert(pref_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash), value, NULL);
+  raxInsert(pref_trees, (unsigned char *) &diff_heap->literal_hash, sizeof(diff_heap->literal_hash), value, NULL);
   return 1;
 }
 
@@ -56,6 +53,7 @@ static void take_tree_assign_foreach(TSNode node, SubtreeRegistry *registry) {
   if (diff_heap->assigned != NULL) {
     Subtree *that_subtree = diff_heap->assigned;
     ts_subtree_registry_assign_share_and_register_tree(registry, that_subtree);
+    diff_heap->assigned = NULL;
   }
 }
 
@@ -99,7 +97,7 @@ void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree 
   if (!diff_heap->skip_node) {
     hashmap_put(self->available_trees, (char *) &diff_heap->id, sizeof(void *), subtree);
     if (self->_preferred_trees != NULL) {
-      raxInsert(self->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
+      raxInsert(self->_preferred_trees, (unsigned char *) &diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
                 subtree, NULL);
     }
   }
@@ -123,7 +121,7 @@ ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool prefe
   Subtree *res;
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (preferred) {
-    res = raxFind(ts_subtree_share_preferred_trees(self), (unsigned char *) diff_heap->literal_hash,
+    res = raxFind(ts_subtree_share_preferred_trees(self), (unsigned char *) &diff_heap->literal_hash,
                   sizeof(diff_heap->literal_hash));
     if (res == raxNotFound) {
       res = NULL;

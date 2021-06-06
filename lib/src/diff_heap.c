@@ -270,14 +270,13 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
     select_available_tree(&next_nodes, that_node.tree, false, registry);
     while (next_nodes.size) {
       NodeEntry entry = array_pop(&next_nodes);
-      if (!entry.valid) {
-        continue;
-      }
-      TSNode next_node = ts_diff_heap_node(entry.subtree, that_node.tree);
-      for (uint32_t i = 0; i < ts_real_node_child_count(next_node); i++) {
-        TSNode child_node = ts_real_node_child(next_node, i);
-        Subtree *child_subtree = (Subtree *) child_node.id;
-        priority_queue_insert(queue, child_subtree);
+      if (entry.valid) {
+        TSNode next_node = ts_diff_heap_node(entry.subtree, that_node.tree);
+        for (uint32_t i = 0; i < ts_real_node_child_count(next_node); i++) {
+          TSNode child_node = ts_real_node_child(next_node, i);
+          Subtree *child_subtree = (Subtree *) child_node.id;
+          priority_queue_insert(queue, child_subtree);
+        }
       }
     }
   }
@@ -433,7 +432,7 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   Subtree *self_subtree = (Subtree *) self.id;
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   if (this_diff_heap->assigned != NULL) {
-    //this_diff_heap->assigned = NULL; // TODO: Why should this be set to NULL?
+    this_diff_heap->assigned = NULL;
   } else {
     Unload unload_data = {
       .id=this_diff_heap->id,
