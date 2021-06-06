@@ -1,7 +1,14 @@
 #include "array.h"
 #include "edit.h"
 #include "edit_script.h"
-#include "diff_heap.h"
+
+static inline bool is_relevant(bool minimized, const TSLanguage *lang, TSSymbol symbol) {
+  return !minimized || ts_language_symbol_type(lang, symbol) == TSSymbolTypeRegular;
+}
+
+static inline bool is_root(void *id, TSSymbol symbol) {
+  return id == NULL && symbol == UINT16_MAX;
+}
 
 void print__edit_script(const TSLanguage *language, const EditScript *edit_script, bool minimized) {
   const EditArray edit_array = edit_script->edits;
@@ -14,7 +21,7 @@ void print__edit_script(const TSLanguage *language, const EditScript *edit_scrip
                edit->update.new_start.bytes, edit->update.new_size.bytes, edit->update.new_padding.bytes);
         break;
       case LOAD:
-        if (minimized && ts_language_symbol_type(language, edit->load.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->load.tag)) {
           break;
         }
         if (edit->load.is_leaf) {
@@ -34,14 +41,18 @@ void print__edit_script(const TSLanguage *language, const EditScript *edit_scrip
         }
         break;
       case ATTACH:
-        if (minimized && ts_language_symbol_type(language, edit->attach.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->attach.tag)) {
           break;
         }
-        printf("[ATTACH | %p] To parent %p of type \"%s\" on link %d\n", edit->attach.id, edit->attach.parent_id,
-               ts_language_symbol_name(language, edit->attach.parent_tag), edit->attach.link);
+        if (is_root(edit->attach.parent_id, edit->attach.parent_tag)) {
+          printf("[ATTACH | %p] To parent ROOT on link %d\n", edit->attach.id, edit->attach.link);
+        } else {
+          printf("[ATTACH | %p] To parent %p of type \"%s\" on link %d\n", edit->attach.id, edit->attach.parent_id,
+                 ts_language_symbol_name(language, edit->attach.parent_tag), edit->attach.link);
+        }
         break;
       case LOAD_ATTACH:
-        if (minimized && ts_language_symbol_type(language, edit->load_attach.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->load_attach.tag)) {
           break;
         }
         if (edit->load_attach.is_leaf) {
@@ -60,20 +71,29 @@ void print__edit_script(const TSLanguage *language, const EditScript *edit_scrip
             }
             printf("%p", prototype->child_id);
           }
-          printf("] and attach to parent %p of type \"%s\" on link %d\n", edit->load_attach.parent_id,
-                 ts_language_symbol_name(language, edit->load_attach.parent_tag), edit->load_attach.link);
+          if (is_root(edit->load_attach.parent_id, edit->load_attach.parent_tag)) {
+            printf("] and attach to parent ROOT on link %d\n", edit->load_attach.link);
+          } else {
+            printf("] and attach to parent %p of type \"%s\" on link %d\n", edit->load_attach.parent_id,
+                   ts_language_symbol_name(language, edit->load_attach.parent_tag), edit->load_attach.link);
+          }
         }
         break;
       case DETACH:
-        if (minimized && ts_language_symbol_type(language, edit->detach.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->detach.tag)) {
           break;
         }
-        printf("[DETACH | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d\n", edit->detach.id,
-               ts_language_symbol_name(language, edit->detach.tag), edit->detach.parent_id,
-               ts_language_symbol_name(language, edit->detach.parent_tag), edit->detach.link);
+        if (is_root(edit->detach.parent_id, edit->detach.parent_tag)) {
+          printf("[DETACH | %p] Node of type \"%s\" from parent ROOT on link %d\n", edit->detach.id,
+                 ts_language_symbol_name(language, edit->detach.tag), edit->detach.link);
+        } else {
+          printf("[DETACH | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d\n", edit->detach.id,
+                 ts_language_symbol_name(language, edit->detach.tag), edit->detach.parent_id,
+                 ts_language_symbol_name(language, edit->detach.parent_tag), edit->detach.link);
+        }
         break;
       case UNLOAD:
-        if (minimized && ts_language_symbol_type(language, edit->unload.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->unload.tag)) {
           break;
         }
         printf("[UNLOAD | %p] Node of type \"%s\"", edit->unload.id,
@@ -93,14 +113,21 @@ void print__edit_script(const TSLanguage *language, const EditScript *edit_scrip
         printf("\n");
         break;
       case DETACH_UNLOAD:
-        if (minimized && ts_language_symbol_type(language, edit->detach_unload.tag) != TSSymbolTypeRegular) {
+        if (!is_relevant(minimized, language, edit->detach_unload.tag)) {
           break;
         }
-        printf("[DETACH_UNLOAD | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d",
-               edit->detach_unload.id,
-               ts_language_symbol_name(language, edit->detach_unload.tag),
-               edit->detach_unload.parent_id, ts_language_symbol_name(language, edit->detach_unload.parent_tag),
-               edit->detach_unload.link);
+        if (is_root(edit->detach_unload.parent_id, edit->detach_unload.parent_tag)) {
+          printf("[DETACH_UNLOAD | %p] Node of type \"%s\" from parent ROOT on link %d",
+                 edit->detach_unload.id,
+                 ts_language_symbol_name(language, edit->detach_unload.tag),
+                 edit->detach_unload.link);
+        } else {
+          printf("[DETACH_UNLOAD | %p] Node of type \"%s\" from parent %p of type \"%s\" on link %d",
+                 edit->detach_unload.id,
+                 ts_language_symbol_name(language, edit->detach_unload.tag),
+                 edit->detach_unload.parent_id, ts_language_symbol_name(language, edit->detach_unload.parent_tag),
+                 edit->detach_unload.link);
+        }
         if (edit->detach_unload.kids.size > 0) {
           printf(" and set its kids free [");
           ChildPrototypeArray kids = edit->detach_unload.kids;

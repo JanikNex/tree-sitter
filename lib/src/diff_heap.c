@@ -606,13 +606,10 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
   //printf("Create SubtreePool\n");
   SubtreePool subtree_pool = ts_subtree_pool_new(32);
   //printf("Fill EditScriptBuffer\n");
-  Subtree computed_subtree = compute_edit_script(self, other, NULL, 0, -1, &edit_script_buffer, &subtree_pool,
-                                                 self_code, other_code,
-                                                 literal_map); // TODO: Look for correct initial parameters!
+  Subtree computed_subtree = compute_edit_script(self, other, NULL, UINT16_MAX, 0, &edit_script_buffer, &subtree_pool,
+                                                 self_code, other_code, literal_map);
   //printf("Finalize EditScriptBuffer\n");
   EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
-  //printf("Balance Subtree\n");
-  //ts_subtree_balance(computed_subtree, &subtree_pool, this_tree->language); //TODO: No balance needed?
   //printf("Constructing Tree\n");
   TSTree *result = ts_tree_new(
     computed_subtree,
@@ -638,9 +635,8 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
   ts_tree_diff_graph(self, other, this_tree->language, graph_file);
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create();
   SubtreePool subtree_pool = ts_subtree_pool_new(32);
-  Subtree computed_subtree = compute_edit_script(self, other, NULL, 0, -1, &edit_script_buffer, &subtree_pool,
-                                                 self_code, other_code,
-                                                 literal_map); // TODO: Look for correct initial parameters!
+  Subtree computed_subtree = compute_edit_script(self, other, NULL, UINT16_MAX, 0, &edit_script_buffer, &subtree_pool,
+                                                 self_code, other_code, literal_map);
   EditScript *edit_script = ts_edit_script_buffer_finalize(&edit_script_buffer);
   TSTree *result = ts_tree_new(
     computed_subtree,

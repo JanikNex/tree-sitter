@@ -53,7 +53,7 @@ static void take_tree_assign_foreach(TSNode node, SubtreeRegistry *registry) {
   if (diff_heap->assigned != NULL) {
     Subtree *that_subtree = diff_heap->assigned;
     ts_subtree_registry_assign_share_and_register_tree(registry, that_subtree);
-    diff_heap->assigned = NULL;
+    diff_heap->assigned = NULL; // TODO: Own addition
   }
 }
 
