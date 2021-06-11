@@ -970,6 +970,8 @@ bool ts_diff_tree_cursor_goto_next_sibling(TSTreeCursor *);
 
 bool ts_diff_tree_cursor_goto_first_child(TSTreeCursor *);
 
+void ts_reconstruction_test(TSNode, TSNode);
+
 #ifdef __cplusplus
 }
 #endif
