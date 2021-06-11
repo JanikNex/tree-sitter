@@ -682,3 +682,37 @@ void ts_node_edit(TSNode *self, const TSInputEdit *edit) {
   self->context[1] = start_point.row;
   self->context[2] = start_point.column;
 }
+
+/**
+ * Returns the specified TSNode child of the given node (includes invisible nodes)
+ * @param self Parent TSNode
+ * @param child_index Index of the wanted child
+ * @return Child as TSNode
+ */
+TSNode ts_real_node_child(TSNode self, uint32_t child_index) {
+  TSNode result = self;
+  TSNode child;
+  uint32_t index = 0;
+  NodeChildIterator iterator = ts_node_iterate_children(&result);
+  while (ts_node_child_iterator_next(&iterator, &child)) {
+    if (index == child_index) {
+      return child;
+    }
+    index++;
+  }
+  return ts_node_new(NULL, NULL, length_zero(), 0);
+}
+
+/**
+ * Returns the actual child count of the node (including invisible childs).
+ * @param self TSNode
+ * @return Number of children
+ */
+uint32_t ts_real_node_child_count(TSNode self) {
+  Subtree tree = *(const Subtree *) self.id;
+  if (ts_subtree_child_count(tree) > 0) {
+    return tree.ptr->child_count;
+  } else {
+    return 0;
+  }
+}
