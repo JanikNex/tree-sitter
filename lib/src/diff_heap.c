@@ -452,17 +452,23 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     SHA256_Context structural_context;
     SHA256_Context literal_context;
     ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code); // Init new hash
+    unsigned int new_treesize = 0;
+    unsigned int new_treeheight = 0;
     for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
       TSNode this_kid = ts_real_node_child(self, i);
       TSNode that_kid = ts_real_node_child(other, i);
       // compute editscript and constructed subtree of this child
       Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id, ts_node_symbol(self), i,
                                                 buffer, subtree_pool, self_code, other_code, literal_map);
-      ts_diff_heap_hash_child(&structural_context, &literal_context, ts_subtree_node_diff_heap(kid_subtree));
+      TSDiffHeap *kid_diff_heap = ts_subtree_node_diff_heap(kid_subtree);
+      ts_diff_heap_hash_child(&structural_context, &literal_context, kid_diff_heap);
+      new_treesize += kid_diff_heap->treesize;
+      new_treeheight = kid_diff_heap->treeheight > new_treeheight ? kid_diff_heap->treeheight : new_treeheight;
       array_push(&subtree_array, kid_subtree);
     }
-    ts_diff_heap_hash_finalize(&structural_context, &literal_context,
-                               this_diff_heap); // TODO: update treesize and height
+    ts_diff_heap_hash_finalize(&structural_context, &literal_context, this_diff_heap);
+    this_diff_heap->treeheight = 1 + new_treeheight;
+    this_diff_heap->treesize = 1 + new_treesize;
     // create new parent node
     MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &subtree_array,
                                                   ts_subtree_production_id(*other_subtree), self.tree->language);
@@ -547,16 +553,22 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     // -> Leaf
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
+    unsigned int tree_size = 0;
+    unsigned int tree_height = 0;
     for (uint32_t i = 0; i < ts_real_node_child_count(other); i++) { // load children
       TSNode other_kid = ts_real_node_child(other, i);
       Subtree kid_subtree = load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree,
                                             subtree_pool);
       TSDiffHeap *kid_diff_heap = ts_subtree_node_diff_heap(kid_subtree); // get the child's DiffHeap
       array_push(&child_prototypes, (ChildPrototype) {.child_id=kid_diff_heap->id});
+      tree_height = kid_diff_heap->treeheight > tree_height ? kid_diff_heap->treeheight : tree_height;
+      tree_size += kid_diff_heap->treesize;
       ts_diff_heap_hash_child(&structural_context, &literal_context, kid_diff_heap); // hash child
       array_push(&kids, kid_subtree);
     }
     ts_diff_heap_hash_finalize(&structural_context, &literal_context, new_node_diff_heap);
+    new_node_diff_heap->treeheight = 1 + tree_height;
+    new_node_diff_heap->treesize = 1 + tree_size;
     // Create new node
     MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &kids,
                                                   ts_subtree_production_id(*other_subtree), self_tree->language);
@@ -601,6 +613,8 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
                                            ts_subtree_depends_on_column(*other_subtree),
                                            ts_subtree_is_keyword(*other_subtree), self_tree->language);
     ts_diff_heap_hash_finalize(&structural_context, &literal_context, new_node_diff_heap);
+    new_node_diff_heap->treeheight = 1;
+    new_node_diff_heap->treesize = 1;
     MutableSubtree mut_leaf = ts_subtree_to_mut_unsafe(new_leaf);
     ts_subtree_assign_node_diff_heap(&mut_leaf, new_node_diff_heap); // assign DiffHeap to the new leaf
     new_leaf = ts_subtree_from_mut(mut_leaf);
