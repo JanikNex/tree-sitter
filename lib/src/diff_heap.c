@@ -336,8 +336,10 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   Length new_size = ts_subtree_size(*other_subtree);
   Length self_padding = ts_subtree_padding(*self_subtree);
   Length other_padding = ts_subtree_padding(*other_subtree);
-  const Length *self_position = &ts_subtree_node_diff_heap(*self_subtree)->position;
-  const Length *other_position = &ts_subtree_node_diff_heap(*other_subtree)->position;
+  TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+  TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
+  const Length *self_position = &self_diff_heap->position;
+  const Length *other_position = &other_diff_heap->position;
   if (is_literal) { // are those nodes literals
     // Perform update if the length or the content of the literal changed
     if (!length_equal(old_size, new_size) ||
@@ -376,8 +378,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     }
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
-  TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
-  TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
+  memcpy(self_diff_heap->literal_hash, other_diff_heap->literal_hash, SHA256_HASH_SIZE);
   self_diff_heap->position = *other_position;
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
@@ -447,6 +448,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     Subtree *self_subtree = (Subtree *) self.id;
     Subtree *other_subtree = (Subtree *) other.id;
     TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+    TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
     diff_heap_inc(this_diff_heap); // increment reference counter since we reuse a DiffHeap from the original tree
     SubtreeArray subtree_array = array_new();
     SHA256_Context structural_context;
@@ -469,6 +471,11 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     ts_diff_heap_hash_finalize(&structural_context, &literal_context, this_diff_heap);
     this_diff_heap->treeheight = 1 + new_treeheight;
     this_diff_heap->treesize = 1 + new_treesize;
+    this_diff_heap->position = other_diff_heap->position;
+    this_diff_heap->assigned = NULL;
+    this_diff_heap->share = NULL;
+    other_diff_heap->assigned = NULL;
+    other_diff_heap->share = NULL;
     // create new parent node
     MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &subtree_array,
                                                   ts_subtree_production_id(*other_subtree), self.tree->language);
@@ -489,6 +496,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
 void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   Subtree *self_subtree = (Subtree *) self.id;
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+  this_diff_heap->share = NULL; // reset share
   if (this_diff_heap->assigned != NULL) { // check if assigned
     this_diff_heap->assigned = NULL; // reset assignment
   } else {
@@ -529,8 +537,8 @@ void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
  */
 static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
                                const TSLiteralMap *literal_map, const TSTree *self_tree, SubtreePool *subtree_pool) {
-  const TSDiffHeap *other_diff_heap = other.diff_heap;
   Subtree *other_subtree = (Subtree *) other.id;
+  TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   if (other_diff_heap->assigned != NULL) { // check if assigned
     // Assigned -> No LoadEdit needed -> try to update literals
     const Subtree *assigned_subtree = other_diff_heap->assigned; // get the assigned Subtree in the original tree
@@ -539,6 +547,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     ts_subtree_retain(*assigned_subtree); // increment reference counter of the subtree, since we reuse it
     return *assigned_subtree;
   }
+  other_diff_heap->share = NULL;
   void *new_id = generate_new_id(); // generate new ID for the new subtree
   Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
   TSDiffHeap *new_node_diff_heap = ts_diff_heap_new_with_id(node_position, new_id); // create new DiffHeap

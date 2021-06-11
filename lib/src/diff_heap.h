@@ -22,7 +22,7 @@ struct TSDiffHeap {
     void *id;
     volatile uint32_t ref_count;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
-    const unsigned char literal_hash[SHA256_HASH_SIZE];
+    unsigned char literal_hash[SHA256_HASH_SIZE];
     unsigned int treeheight;
     unsigned int treesize;
     SubtreeShare *share;
