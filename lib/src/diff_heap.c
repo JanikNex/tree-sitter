@@ -339,8 +339,8 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   const Length *self_position = &ts_subtree_node_diff_heap(*self_subtree)->position;
   const Length *other_position = &ts_subtree_node_diff_heap(*other_subtree)->position;
   if (is_literal) { // are those nodes literals
-    // Perform update if the length or the content of the literal changed // TODO: Remove padding compare
-    if (!length_equal(old_size, new_size) || !length_equal(self_padding, other_padding) ||
+    // Perform update if the length or the content of the literal changed
+    if (!length_equal(old_size, new_size) ||
         0 != memcmp(((self_code) + self_position->bytes),
                     ((other_code) + other_position->bytes),
                     old_size.bytes)) {
@@ -377,9 +377,14 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
   TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+  TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   self_diff_heap->position = *other_position;
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
+  self_diff_heap->assigned = NULL;
+  self_diff_heap->share = NULL;
+  other_diff_heap->assigned = NULL;
+  other_diff_heap->share = NULL;
 }
 
 /**
