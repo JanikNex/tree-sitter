@@ -382,9 +382,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   self_diff_heap->position = *other_position;
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
-  self_diff_heap->assigned = NULL;
   self_diff_heap->share = NULL;
-  other_diff_heap->assigned = NULL;
   other_diff_heap->share = NULL;
 }
 
@@ -405,7 +403,7 @@ update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const 
   int lvl = 0;
   TSNode self_child;
   TSNode other_child;
-  do { //TODO: Use correct changed offsets
+  do {
     self_child = ts_tree_cursor_current_node(&self_cursor);
     other_child = ts_tree_cursor_current_node(&other_cursor);
     update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
@@ -651,13 +649,14 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
                             EditScriptBuffer *buffer, SubtreePool *subtree_pool, const char *self_code,
                             const char *other_code,
                             const TSLiteralMap *literal_map) {
-  const TSDiffHeap *this_diff_heap = self.diff_heap;
-  const TSDiffHeap *other_diff_heap = other.diff_heap;
   Subtree *this_subtree = (Subtree *) self.id;
+  TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
+  const TSDiffHeap *other_diff_heap = other.diff_heap;
   Subtree *assigned_to_this = this_diff_heap->assigned;
   if (this_diff_heap->assigned != NULL && ts_subtree_node_diff_heap(*assigned_to_this)->id == other_diff_heap->id) {
     // self == other
     update_literals_iter(self, other, buffer, self_code, other_code, literal_map);
+    this_diff_heap->assigned = NULL;
     ts_subtree_retain(*this_subtree); // increment subtree reference counter since we reuse this subtree
     return *this_subtree;
   } else if (this_diff_heap->assigned == NULL && other_diff_heap->assigned == NULL) {
@@ -712,7 +711,7 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
  */
 TSDiffResult
 ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self_code, const char *other_code,
-              const TSLiteralMap *literal_map) { //TODO: Cleanup -> free used memory
+              const TSLiteralMap *literal_map) {
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
   SubtreeRegistry *registry = ts_subtree_registry_create(); // create new SubtreeRegistry
@@ -829,10 +828,10 @@ void ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     printf("[%p | %p] Literal hash mismatch\n", d1->id, d2->id);
     return;
   }
-  if (d1->assigned != NULL) {
+  /*if (d1->assigned != NULL) {
     printf("[%p] Assigned not reset\n", d1->id);
     return;
-  }
+  }*/
   if (d2->assigned != NULL) {
     printf("[%p] Assigned not reset\n", d2->id);
     return;
