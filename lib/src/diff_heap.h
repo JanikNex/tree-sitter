@@ -76,6 +76,12 @@ static inline void *generate_new_id() { // TODO: Is there a better way to genera
   return ts_malloc(1);
 }
 
+/**
+ * Creates a new TSDiffHeap with a random id
+ * Allocates memory!
+ * @param pos Length - Absolute position in the Sourcecode
+ * @return Pointer to the new TSDiffHeap
+ */
 static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
@@ -87,6 +93,13 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   return node_diff_heap;
 }
 
+/**
+ * Creates a new TSDiffHeap with a specific id
+ * Allocates memory!
+ * @param pos Length - Absolute position in the Sourcecode
+ * @param id Specific id (void *)
+ * @return Pointer to the new TSDiffHeap
+ */
 static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = id;
@@ -98,6 +111,16 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
   return node_diff_heap;
 }
 
+/**
+ * Prepares the contexts for structural and literal hashing. For this purpose, the contexts are first
+ * initialized and then the node type for the structural and (if literal) the value of the literal
+ * for the literal hash is added.
+ * @param structural_context Pointer to the structural context
+ * @param literal_context Pointer to the literal context
+ * @param node Pointer to the current node
+ * @param literal_map Pointer to the literal map
+ * @param code Pointer to the beginning of the sourcecode
+ */
 static inline void
 ts_diff_heap_hash_init(SHA256_Context *structural_context, SHA256_Context *literal_context, const TSNode *node,
                        const TSLiteralMap *literal_map, const char *code) {
@@ -127,6 +150,12 @@ ts_diff_heap_hash_init(SHA256_Context *structural_context, SHA256_Context *liter
   }
 }
 
+/**
+ * If the TSNode has children, their hashes must also be added to their own hash.
+ * @param structural_context Pointer to the structural context
+ * @param literal_context Pointer to the literal hash
+ * @param child_heap Pointer to the TSDiffHeap of a child
+ */
 static inline void
 ts_diff_heap_hash_child(SHA256_Context *structural_context, SHA256_Context *literal_context,
                         const TSDiffHeap *child_heap) {
@@ -140,6 +169,12 @@ ts_diff_heap_hash_child(SHA256_Context *structural_context, SHA256_Context *lite
   }
 }
 
+/**
+ * Finalize the hashing by calculating the SHA256 hashes and storing them in the TSDiffHeap.
+ * @param structural_context Pointer to the structural context
+ * @param literal_context Pointer to the literal context
+ * @param diff_heap Pointer to the TSDiffHeap of the current node
+ */
 static inline void
 ts_diff_heap_hash_finalize(SHA256_Context *structural_context, SHA256_Context *literal_context,
                            const TSDiffHeap *diff_heap) {
@@ -153,12 +188,22 @@ ts_diff_heap_hash_finalize(SHA256_Context *structural_context, SHA256_Context *l
   }
 }
 
+/**
+ * Returns the subtree at the current cursor position
+ * @param cursor Pointer to the TSTreeCursor
+ * @return Pointer to the Subtree
+ */
 static inline Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *cursor) {
   const TreeCursor *self = (const TreeCursor *) cursor;
   TreeCursorEntry *last_entry = array_back(&self->stack);
   return (Subtree *) last_entry->subtree;
 }
 
+/**
+ * Assigns a share to each subtree (excluding the root)
+ * @param node TSNode
+ * @param registry Pointer to the SubtreeRegistry
+ */
 static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *registry) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
   int lvl = 0;
@@ -179,6 +224,11 @@ static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *re
   ts_tree_cursor_delete(&cursor);
 }
 
+/**
+ * Assigns a share to each subtree (including the root)
+ * @param node
+ * @param registry
+ */
 static inline void foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
   const TSDiffHeap *diff_heap = node.diff_heap;
   if (!diff_heap->skip_node) {
@@ -188,6 +238,11 @@ static inline void foreach_tree_assign_share(TSNode node, SubtreeRegistry *regis
   foreach_subtree_assign_share(node, registry);
 };
 
+/**
+ * Assigns a share to each sub-tree and registers it as an available tree (excluding the root)
+ * @param node TSNode
+ * @param registry Pointer to the SubtreeRegistry
+ */
 static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
   TSTreeCursor cursor = ts_tree_cursor_new(node);
   int lvl = 0;
@@ -208,6 +263,11 @@ static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, S
   ts_tree_cursor_delete(&cursor);
 }
 
+/**
+ * Assigns a share to each sub-tree and registers it as an available tree (including the root)
+ * @param node TSNode
+ * @param registry Pointer to the SubtreeRegistry
+ */
 static inline void foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
   const TSDiffHeap *diff_heap = node.diff_heap;
   if (!diff_heap->skip_node) {
@@ -217,10 +277,22 @@ static inline void foreach_tree_assign_share_and_register_tree(TSNode node, Subt
   foreach_subtree_assign_share_and_register_tree(node, registry);
 };
 
+/**
+ * Creates a new TSTreeCursor starting at the root of the given tree
+ * @param tree Pointer to the TSTree
+ * @return New TSTreeCursor
+ */
 static inline TSTreeCursor ts_diff_heap_cursor_create(const TSTree *tree) {
   return ts_tree_cursor_new(ts_tree_root_node(tree));
 }
 
+/**
+ * Assigns two trees to each other
+ * @param this_subtree Pointer a subtree
+ * @param that_subtree Pointer to another subtree
+ * @param this_diff_heap TSDiffHeap of the first subtree
+ * @param that_diff_heap TSDiffHeap of the second subtree
+ */
 static inline void
 assign_tree(Subtree *this_subtree, Subtree *that_subtree, TSDiffHeap *this_diff_heap, TSDiffHeap *that_diff_heap) {
   this_diff_heap->assigned = that_subtree;

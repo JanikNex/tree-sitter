@@ -2,10 +2,22 @@
 
 #define ADVANCED_EDITS
 
+/**
+ * Creates a new EditScriptBuffer
+ * Allocates Memory!
+ * @return New EditScriptBuffer
+ */
 EditScriptBuffer ts_edit_script_buffer_create() {
   return (EditScriptBuffer) {.negative_buffer = array_new(), .positive_buffer=array_new()};
 }
 
+/**
+ * Inserts an edit into the positive or negative buffer depending on the type.
+ * If advanced edits are activated, successive load and attach edits as well as detach
+ * and unload edits can be converted into the combined form.
+ * @param buffer Pointer to the EditScriptBuffer
+ * @param edit SugaredEdit to be added
+ */
 void ts_edit_script_buffer_add(EditScriptBuffer *buffer, SugaredEdit edit) {
   EditArray *pos_buff = &buffer->positive_buffer;
   EditArray *neg_buff = &buffer->negative_buffer;
@@ -76,6 +88,12 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, SugaredEdit edit) {
   }
 }
 
+/**
+ * Finalizes the buffer by appending the negative to the positive edits.
+ * A new EditScript is created for this, for which memory is allocated first.
+ * @param buffer Pointer to the EditScriptBuffer
+ * @return Pointer to the generated EditScript
+ */
 EditScript *ts_edit_script_buffer_finalize(EditScriptBuffer *buffer) {
   array_push_all(&buffer->negative_buffer, &buffer->positive_buffer);
   array_delete(&buffer->positive_buffer);

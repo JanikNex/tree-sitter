@@ -7,6 +7,11 @@
 #include "edit.h"
 #include "edit_script.h"
 
+/**
+ * The EditScriptBuffer is used as an intermediate layer during the construction of the
+ * EditScript. During the comparison, the edits are added to the buffer and divided into
+ * positive and negative edits.
+ */
 typedef struct {
     EditArray negative_buffer;
     EditArray positive_buffer;

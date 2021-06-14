@@ -2,15 +2,35 @@
 #include "edit.h"
 #include "edit_script.h"
 
+/**
+ * Indicates whether an edit is relevant.
+ * (Filters all invisible nodes if the minimized EditScript should be output)
+ * @param minimized bool that indicates whether the minimized EditScript was requested
+ * @param lang Pointer to the TSLanguage
+ * @param symbol TSSymbol of the node
+ * @return bool that indicates whether Edit is relevant
+ */
 static inline bool is_relevant(bool minimized, const TSLanguage *lang, TSSymbol symbol) {
   return !minimized || ts_language_symbol_type(lang, symbol) == TSSymbolTypeRegular;
 }
 
+/**
+ * Indicates whether a parent node is the actual root.
+ * @param id ID (void *) of the parent node
+ * @param symbol TSSymbol of the parent node
+ * @return bool that indicates whether the parent node is the actual root
+ */
 static inline bool is_root(void *id, TSSymbol symbol) {
   return id == NULL && symbol == UINT16_MAX;
 }
 
-void print__edit_script(const TSLanguage *language, const EditScript *edit_script, bool minimized) {
+/**
+ * Internal function that prints the EditScript
+ * @param language Pointer to the TSLanguage
+ * @param edit_script Pointer to the EditScript
+ * @param minimized bool that specifies whether the minimized version should be output
+ */
+static inline void print__edit_script(const TSLanguage *language, const EditScript *edit_script, bool minimized) {
   const EditArray edit_array = edit_script->edits;
   for (uint32_t i = 0; i < edit_array.size; i++) {
     SugaredEdit *edit = array_get(&edit_array, i);
@@ -146,14 +166,30 @@ void print__edit_script(const TSLanguage *language, const EditScript *edit_scrip
   }
 }
 
+/**
+ * Prints the full EditScript
+ * @param language Pointer to the TSLanguage
+ * @param edit_script Pointer to the EditScript
+ */
 void print_edit_script(const TSLanguage *language, const EditScript *edit_script) {
   print__edit_script(language, edit_script, false);
 }
 
+/**
+ * Prints the minimized EditScript
+ * @param language Pointer to the TSLanguage
+ * @param edit_script Pointer to the EditScript
+ */
 void print_minimized_edit_script(const TSLanguage *language, const EditScript *edit_script) {
   print__edit_script(language, edit_script, true);
 }
 
+/**
+ * Converts a single SugaredEdit into an array of CoreEdits
+ * Allocates memory!
+ * @param edit SugaredEdit
+ * @return Array of CoreEdit(s)
+ */
 CoreEditArray edit_as_core_edit(SugaredEdit edit) {
   CoreEditArray result = array_new();
   CoreEdit ce1;
@@ -205,6 +241,10 @@ CoreEditArray edit_as_core_edit(SugaredEdit edit) {
   return result;
 }
 
+/**
+ * Deletes an EditScript and frees the used memory.
+ * @param edit_script Pointer to the EditScript
+ */
 void ts_edit_script_delete(EditScript *edit_script) {
   for (uint32_t i = 0; i < edit_script->edits.size; ++i) {
     SugaredEdit *edit = array_get(&edit_script->edits, i);
@@ -233,6 +273,11 @@ void ts_edit_script_delete(EditScript *edit_script) {
   ts_free(edit_script);
 }
 
+/**
+ * Returns the number of edits of an EditScript.
+ * @param edit_script Pointer to the EditScript
+ * @return uint32_t Number of edits
+ */
 uint32_t ts_edit_script_length(EditScript *edit_script) {
   return edit_script->edits.size;
 }
