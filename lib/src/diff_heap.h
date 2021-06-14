@@ -200,8 +200,10 @@ static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *re
   int lvl = 0;
   Subtree *subtree;
   do {
-    subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-    ts_subtree_registry_assign_share(registry, subtree);
+    if (lvl != 0) {
+      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+      ts_subtree_registry_assign_share(registry, subtree);
+    }
     while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
       lvl++;
       subtree = ts_diff_heap_cursor_get_subtree(&cursor);
@@ -239,8 +241,10 @@ static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, S
   int lvl = 0;
   Subtree *subtree;
   do {
-    subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+    if (lvl != 0) {
+      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
+      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+    }
     while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
       lvl++;
       subtree = ts_diff_heap_cursor_get_subtree(&cursor);
