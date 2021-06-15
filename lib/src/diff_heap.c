@@ -41,15 +41,24 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
                                 const TSLiteralMap *literal_map) { // TODO: Possible without recursion?
   TSNode node = ts_tree_cursor_current_node(cursor);
   Subtree *subtree = (Subtree *) node.id;
-  MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
   Length node_position = {.bytes=node.context[0], .extent={.row=node.context[1], .column=node.context[2]}};
+
+  // Create new TSDiffHeap
   TSDiffHeap *node_diff_heap = ts_diff_heap_new(node_position);
+
+  //Prepare for hashing
   SHA256_Context structural_context;
   SHA256_Context literal_context;
   ts_diff_heap_hash_init(&structural_context, &literal_context, &node, literal_map, code);
+
   unsigned int tree_height = 0;
   unsigned int tree_size = 0;
   TSDiffHeap *child_heap;
+
+  // Traverse tree (depth-first)
+  // - Initialize children
+  // - Whenever the cursor returns a parent node, add children hashes to parent hash
+  // - Update treeheight and treesize of the parent node
   if (ts_diff_tree_cursor_goto_first_child(cursor)) {
     child_heap = ts_diff_heap_initialize_subtree(cursor, code, literal_map);
     tree_height = child_heap->treeheight > tree_height ? child_heap->treeheight : tree_height;
@@ -63,9 +72,15 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
     }
     ts_diff_tree_cursor_goto_parent(cursor);
   }
+  // Update treesize and treeheight of the current node
   node_diff_heap->treesize = 1 + tree_size;
   node_diff_heap->treeheight = 1 + tree_height;
+
+  // Finalize hashes of the current node
   ts_diff_heap_hash_finalize(&structural_context, &literal_context, node_diff_heap);
+
+  // Assign generated DiffHeap to the current node
+  MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
   ts_subtree_assign_node_diff_heap(&mut_subtree, node_diff_heap);
   *subtree = ts_subtree_from_mut(mut_subtree);
   return node_diff_heap;
@@ -138,8 +153,11 @@ void ts_diff_heap_delete(const TSTree *tree) {
 static bool is_signature_equal(TSNode this_node, TSNode that_node) {
   uint32_t this_child_count = ts_real_node_child_count(this_node);
   uint32_t that_child_count = ts_real_node_child_count(that_node);
+  // Check node type
   if (ts_node_symbol(this_node) != ts_node_symbol(that_node)) return false;
+  // Check number of children
   if (this_child_count != that_child_count) return false;
+  // Check whether children are equally unnamed or appended to the same field
   if (this_child_count > 0) {
     bool field_eq = true;
     TSTreeCursor this_cursor = ts_tree_cursor_new(this_node);
@@ -226,8 +244,12 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
 TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   return (TSNode) {
-    {diff_heap->position.bytes, diff_heap->position.extent.row, diff_heap->position.extent.column,
-     ts_subtree_symbol(*subtree)},
+    {
+      diff_heap->position.bytes,
+      diff_heap->position.extent.row,
+      diff_heap->position.extent.column,
+      ts_subtree_symbol(*subtree)
+    },
     subtree,
     tree,
     diff_heap
@@ -327,7 +349,7 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
  */
 static inline void
 update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
-                const TSLiteralMap *literal_map) { //TODO: pass updates to parents
+                const TSLiteralMap *literal_map) {
   bool is_literal = ts_literal_map_is_literal(literal_map, ts_node_symbol(self)) &&
                     ts_literal_map_is_literal(literal_map, ts_node_symbol(other));
   Subtree *self_subtree = (Subtree *) self.id;
@@ -378,6 +400,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     }
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
+  // copy literal hash from the changed to to reflect possible literal changes
   memcpy(self_diff_heap->literal_hash, other_diff_heap->literal_hash, SHA256_HASH_SIZE);
   self_diff_heap->position = *other_position;
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
@@ -449,6 +472,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
     diff_heap_inc(this_diff_heap); // increment reference counter since we reuse a DiffHeap from the original tree
     SubtreeArray subtree_array = array_new();
+    // Prepare for hashing
     SHA256_Context structural_context;
     SHA256_Context literal_context;
     ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code); // Init new hash
@@ -466,6 +490,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
       new_treeheight = kid_diff_heap->treeheight > new_treeheight ? kid_diff_heap->treeheight : new_treeheight;
       array_push(&subtree_array, kid_subtree);
     }
+    // Finalize hashes and update DiffHeaps
     ts_diff_heap_hash_finalize(&structural_context, &literal_context, this_diff_heap);
     this_diff_heap->treeheight = 1 + new_treeheight;
     this_diff_heap->treesize = 1 + new_treesize;
