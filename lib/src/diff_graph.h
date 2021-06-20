@@ -18,7 +18,6 @@ typedef Array(ColorMapping) ColorMap;
 static const unsigned int COLOR_SIZE = 63;
 
 static const unsigned char colors[] = {
-  1, 0, 103,
   213, 255, 0,
   255, 0, 86,
   158, 0, 142,
@@ -80,7 +79,8 @@ static const unsigned char colors[] = {
   120, 130, 49,
   0, 255, 198,
   255, 110, 65,
-  232, 94, 190
+  232, 94, 190,
+  1, 0, 103
 };
 
 void ts_tree_diff_graph_node(TSNode, const TSLanguage *, FILE *, unsigned char *, ColorMap *);
