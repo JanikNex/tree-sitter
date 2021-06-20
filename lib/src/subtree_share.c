@@ -75,6 +75,24 @@ static void deregister_foreach_subtree(TSNode node, SubtreeRegistry *registry) {
 }
 
 /**
+ * Looks for the literal hash of the given TSDiffHeap in the shares preferred_trees and removes the entry
+ * if the entries value matches the given subtree.
+ * @param share Pointer to a SubtreeShare
+ * @param diff_heap Pointer to the current TSDiffHeap
+ * @param subtree Pointer to the current Subtree
+ */
+static inline void remove_preferred_tree(SubtreeShare *share, TSDiffHeap *diff_heap, Subtree *subtree) {
+  if (share->_preferred_trees != NULL) {
+    Subtree *res = raxFind(share->_preferred_trees, (unsigned char *) &diff_heap->literal_hash,
+                           sizeof(diff_heap->literal_hash));
+    if (res != raxNotFound && res == subtree) {
+      raxRemove(share->_preferred_trees, (unsigned char *) &diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
+                NULL);
+    }
+  }
+}
+
+/**
  * Foreach callback function
  * @param node TSNode
  * @param registry Pointer to the SubtreeRegistry
@@ -101,10 +119,7 @@ static Subtree *take_tree(const SubtreeShare *self, TSNode tree, TSNode that, Su
   // Remove the original tree from the available_tree hashmap and the preferred_trees radix trie
   // Thereby the subtree is no longer available
   hashmap_remove(self->available_trees, (char *) &diff_heap->id, sizeof(void *));
-  if (share->_preferred_trees != NULL) {
-    raxRemove(share->_preferred_trees, (unsigned char *) diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
-              NULL);
-  }
+  remove_preferred_tree(share, diff_heap, (Subtree *) tree.id);
   diff_heap->share = NULL;
 
   // The subtrees of this tree are also no longer available -> deregister
@@ -221,6 +236,7 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
     SubtreeShare *share = diff_heap->share;
     // Remove subtree from share, remove share from subtree and deregister all subtrees
     hashmap_remove(share->available_trees, (char *) &diff_heap->id, sizeof(void *));
+    remove_preferred_tree(share, diff_heap, (Subtree *) node.id);
     share = NULL;
     deregister_foreach_subtree(node, registry);
   } else if (diff_heap->assigned != NULL) {
