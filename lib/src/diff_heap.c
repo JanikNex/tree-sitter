@@ -634,6 +634,12 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
       .depends_on_column=ts_subtree_depends_on_column(*other_subtree),
       .is_keyword=ts_subtree_is_keyword(*other_subtree)
     };
+    if (ts_subtree_has_external_tokens(*other_subtree)) {
+      const ExternalScannerState *node_state = &other_subtree->ptr->external_scanner_state;
+      leaf_data.external_scanner_state = ts_external_scanner_state_copy(node_state);
+    } else if (ts_subtree_is_error(*other_subtree)) {
+      leaf_data.lookahead_char = other_subtree->ptr->lookahead_char;
+    }
     load_data.leaf = leaf_data;
     // Create LoadEdit
     ts_edit_script_buffer_add(buffer,
@@ -663,6 +669,10 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     new_node_diff_heap->treeheight = 1;
     new_node_diff_heap->treesize = 1;
     MutableSubtree mut_leaf = ts_subtree_to_mut_unsafe(new_leaf);
+    if (ts_subtree_has_external_tokens(*other_subtree)) {
+      const ExternalScannerState *node_state = &other_subtree->ptr->external_scanner_state;
+      mut_leaf.ptr->external_scanner_state = ts_external_scanner_state_copy(node_state);
+    }
     ts_subtree_assign_node_diff_heap(&mut_leaf, new_node_diff_heap); // assign DiffHeap to the new leaf
     new_leaf = ts_subtree_from_mut(mut_leaf);
     return new_leaf;

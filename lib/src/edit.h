@@ -17,6 +17,10 @@ typedef struct {
     bool has_external_tokens: 1;
     bool depends_on_column: 1;
     bool is_keyword: 1;
+    union {
+        ExternalScannerState external_scanner_state;
+        int32_t lookahead_char;
+    };
 } EditLeafData;
 
 typedef struct {
