@@ -582,7 +582,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     .tag=ts_node_symbol(other),
   };
   if (ts_real_node_child_count(other) > 0) { // test for children to decide if it's a node or a leaf
-    // -> Leaf
+    // -> Node
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
     unsigned int tree_size = 0;
@@ -602,8 +602,14 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     new_node_diff_heap->treeheight = 1 + tree_height;
     new_node_diff_heap->treesize = 1 + tree_size;
     // Create new node
-    MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &kids,
-                                                  ts_subtree_production_id(*other_subtree), self_tree->language);
+    MutableSubtree mut_node;
+    if (ts_subtree_is_error(*other_subtree)) { // check for error node
+      Subtree err_node = ts_subtree_new_error_node(&kids, ts_subtree_extra(*other_subtree), self_tree->language);
+      mut_node = ts_subtree_to_mut_unsafe(err_node);
+    } else {
+      mut_node = ts_subtree_new_node(ts_node_symbol(other), &kids,
+                                     ts_subtree_production_id(*other_subtree), self_tree->language);
+    }
     ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap); // assign DiffHeap to the new node
     Subtree new_node = ts_subtree_from_mut(mut_node);
     load_data.is_leaf = false;
@@ -636,14 +642,23 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
                                 .load = load_data
                               });
     // Create new leaf
-    Subtree new_leaf = ts_subtree_new_leaf(subtree_pool, ts_subtree_symbol(*other_subtree),
-                                           ts_subtree_padding(*other_subtree),
-                                           ts_subtree_size(*other_subtree),
-                                           ts_subtree_lookahead_bytes(*other_subtree),
-                                           ts_subtree_parse_state(*other_subtree),
-                                           ts_subtree_has_external_tokens(*other_subtree),
-                                           ts_subtree_depends_on_column(*other_subtree),
-                                           ts_subtree_is_keyword(*other_subtree), self_tree->language);
+    Subtree new_leaf;
+    if (ts_subtree_is_error(*other_subtree)) { // check for error leaf
+      int32_t lookahead_char = other_subtree->ptr->lookahead_char;
+      new_leaf = ts_subtree_new_error(subtree_pool, lookahead_char, ts_subtree_padding(*other_subtree),
+                                      ts_subtree_size(*other_subtree),
+                                      ts_subtree_lookahead_bytes(*other_subtree),
+                                      ts_subtree_parse_state(*other_subtree), self_tree->language);
+    } else {
+      new_leaf = ts_subtree_new_leaf(subtree_pool, ts_subtree_symbol(*other_subtree),
+                                     ts_subtree_padding(*other_subtree),
+                                     ts_subtree_size(*other_subtree),
+                                     ts_subtree_lookahead_bytes(*other_subtree),
+                                     ts_subtree_parse_state(*other_subtree),
+                                     ts_subtree_has_external_tokens(*other_subtree),
+                                     ts_subtree_depends_on_column(*other_subtree),
+                                     ts_subtree_is_keyword(*other_subtree), self_tree->language);
+    }
     ts_diff_heap_hash_finalize(&structural_context, &literal_context, new_node_diff_heap);
     new_node_diff_heap->treeheight = 1;
     new_node_diff_heap->treesize = 1;
