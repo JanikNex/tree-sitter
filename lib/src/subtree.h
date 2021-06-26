@@ -129,6 +129,7 @@ typedef struct {
 
 void ts_external_scanner_state_init(ExternalScannerState *, const char *, unsigned);
 const char *ts_external_scanner_state_data(const ExternalScannerState *);
+void ts_external_scanner_state_delete(ExternalScannerState *);
 ExternalScannerState ts_external_scanner_state_copy(const ExternalScannerState *);
 
 void ts_subtree_array_copy(SubtreeArray, SubtreeArray *);

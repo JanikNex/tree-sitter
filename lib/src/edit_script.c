@@ -256,12 +256,22 @@ void ts_edit_script_delete(EditScript *edit_script) {
         array_delete(&edit->detach_unload.kids);
         break;
       case LOAD:
-        if (!edit->load.is_leaf) {
+        if (edit->load.is_leaf) {
+          EditLeafData *leaf_data = &edit->load.leaf;
+          if (leaf_data->has_external_tokens) {
+            ts_external_scanner_state_delete(&leaf_data->external_scanner_state);
+          }
+        } else {
           array_delete(&edit->load.node.kids);
         }
         break;
       case LOAD_ATTACH:
-        if (!edit->load_attach.is_leaf) {
+        if (edit->load_attach.is_leaf) {
+          EditLeafData *leaf_data = &edit->load_attach.leaf;
+          if (leaf_data->has_external_tokens) {
+            ts_external_scanner_state_delete(&leaf_data->external_scanner_state);
+          }
+        } else {
           array_delete(&edit->load_attach.node.kids);
         }
         break;
