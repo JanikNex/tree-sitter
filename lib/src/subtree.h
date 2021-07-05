@@ -165,7 +165,7 @@ char *ts_subtree_string(Subtree, const TSLanguage *, bool include_all);
 void ts_subtree_print_dot_graph(Subtree, const TSLanguage *, FILE *);
 Subtree ts_subtree_last_external_token(Subtree);
 bool ts_subtree_external_scanner_state_eq(Subtree, Subtree);
-void ts_subtree_single_delete(Subtree);
+MutableSubtree ts_subtree_deepcopy(Subtree);
 
 #define SUBTREE_GET(self, name) (self.data.is_inline ? self.data.name : self.ptr->name)
 

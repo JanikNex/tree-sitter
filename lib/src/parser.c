@@ -779,6 +779,24 @@ static bool ts_parser__select_children(
   );
 }
 
+/**
+ * Creates a deepcopy of the passed Subtree, checks the extra parameter of its root and
+ * decrements the reference counter of the root, since we are not reusing the original node.
+ * @param root Original subtree root
+ * @param extra Calculated extra value from the parser
+ * @return Copy of the passed root
+ */
+static Subtree ts_parser__diffable_subtree_reuse(Subtree root, bool extra) {
+  MutableSubtree deep_copy_root = ts_subtree_deepcopy(root);
+  if (extra != ts_subtree_extra(root)) {
+    ts_subtree_set_extra(&deep_copy_root);
+  }
+  if (!root.data.is_inline){
+    atomic_dec((volatile uint32_t *)&root.ptr->ref_count);
+  }
+  return ts_subtree_from_mut(deep_copy_root);
+}
+
 static void ts_parser__shift(
   TSParser *self,
   StackVersion version,
@@ -787,12 +805,16 @@ static void ts_parser__shift(
   bool extra
 ) {
   Subtree subtree_to_push;
-  if (extra != ts_subtree_extra(lookahead)) {
-    MutableSubtree result = ts_subtree_make_mut(&self->tree_pool, lookahead);
-    ts_subtree_set_extra(&result);
-    subtree_to_push = ts_subtree_from_mut(result);
-  } else {
-    subtree_to_push = lookahead;
+  if (ts_subtree_node_diff_heap(lookahead) != NULL){
+    subtree_to_push = ts_parser__diffable_subtree_reuse(lookahead, extra);
+  }else {
+    if (extra != ts_subtree_extra(lookahead)) {
+      MutableSubtree result = ts_subtree_make_mut(&self->tree_pool, lookahead);
+      ts_subtree_set_extra(&result);
+      subtree_to_push = ts_subtree_from_mut(result);
+    } else {
+      subtree_to_push = lookahead;
+    }
   }
 
   bool is_pending = ts_subtree_child_count(subtree_to_push) > 0;
@@ -925,6 +947,9 @@ static void ts_parser__accept(
   Subtree lookahead
 ) {
   assert(ts_subtree_is_eof(lookahead));
+  if (ts_subtree_node_diff_heap(lookahead) != NULL){
+    lookahead = ts_parser__diffable_subtree_reuse(lookahead, ts_subtree_extra(lookahead));
+  }
   ts_stack_push(self->stack, version, lookahead, false, 1);
 
   StackSliceArray pop = ts_stack_pop_all(self->stack, version);

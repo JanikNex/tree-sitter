@@ -43,6 +43,13 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
   Subtree *subtree = (Subtree *) node.id;
   Length node_position = {.bytes=node.context[0], .extent={.row=node.context[1], .column=node.context[2]}};
 
+  // Check if there is already an assigned DiffHeap -> reuse and update
+  if (node.diff_heap != NULL) {
+    TSDiffHeap *existing_diff_heap = ts_subtree_node_diff_heap(*subtree);
+    existing_diff_heap->position = node_position;
+    return existing_diff_heap;
+  }
+
   // Create new TSDiffHeap
   TSDiffHeap *node_diff_heap = ts_diff_heap_new(node_position);
 

@@ -10,6 +10,7 @@
 #include "./length.h"
 #include "./language.h"
 #include "./error_costs.h"
+#include "./diff_heap.h"
 #include <stddef.h>
 
 typedef struct {
@@ -289,6 +290,42 @@ MutableSubtree ts_subtree_make_mut(SubtreePool *pool, Subtree self) {
   MutableSubtree result = ts_subtree_clone(self);
   ts_subtree_release(pool, self);
   return result;
+}
+
+/**
+ * Creates a deepcopy of a subtree.
+ * Traverses the subtree recursively and copies inline data (if inline) or creates a real clone.
+ * If a node is unchanged (changed bit not set), its TSDiffHeap is reused. All calculated data is
+ * reused, but a new ID is generated.
+ * After a child subtree (not inline) has been processed, the reference counter is decremented
+ * because it was increased during cloning.
+ * @param self Root of the subtree to be copied.
+ * @return MutableSubtree of the copied subtree.
+ */
+MutableSubtree ts_subtree_deepcopy(Subtree self){
+  MutableSubtree mut_copy;
+  if (self.data.is_inline){
+    mut_copy =  ts_subtree_to_mut_unsafe(self);
+  }else {
+    mut_copy = ts_subtree_clone(self);
+  }
+  // Copy TSDiffHeap if not changes were applied.
+  if (!ts_subtree_has_changes(self)) {
+    TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(self);
+    assert(self_diff_heap != NULL);
+    TSDiffHeap *shadowed_diff_heap = ts_diff_heap_reuse(self_diff_heap);
+    ts_subtree_assign_node_diff_heap(&mut_copy, shadowed_diff_heap);
+  }
+  // Copy child subtrees recursively
+  for (uint32_t i = 0; i < ts_subtree_child_count(self); i++) {
+    Subtree child = ts_subtree_children(self)[i];
+    MutableSubtree child_copy = ts_subtree_deepcopy(child);
+    ts_subtree_children(self)[i] = ts_subtree_from_mut(child_copy);
+    if (!child.data.is_inline){
+      atomic_dec((volatile uint32_t *)&child.ptr->ref_count);
+    }
+  }
+  return mut_copy;
 }
 
 static void ts_subtree__compress(

@@ -103,6 +103,23 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
 }
 
 /**
+ * Creates a new TSDiffHeap with a new ID but reuses the remaining values of the passed TSDiffHeap.
+ * This is used to create analogous TSDiffHeaps during incremental parsing that keep all calculated values
+ * of the original TSDiffHeap.
+ * @param diff_heap Pointer to the original TSDiffHeap
+ * @return Pointer to the newly created TSDiffHeap
+ */
+static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
+  TSDiffHeap *new_diff_heap = ts_diff_heap_new(diff_heap->position);
+  new_diff_heap->skip_node = diff_heap->skip_node;
+  new_diff_heap->treeheight = diff_heap->treeheight;
+  new_diff_heap->treesize = diff_heap->treesize;
+  memcpy((void *) &new_diff_heap->structural_hash[0], diff_heap->structural_hash, SHA256_HASH_SIZE);
+  memcpy(new_diff_heap->literal_hash, diff_heap->literal_hash, SHA256_HASH_SIZE);
+  return new_diff_heap;
+}
+
+/**
  * Prepares the contexts for structural and literal hashing. For this purpose, the contexts are first
  * initialized and then the node type for the structural and (if literal) the value of the literal
  * for the literal hash is added.
