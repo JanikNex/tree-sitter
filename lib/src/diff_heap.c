@@ -4,27 +4,7 @@
 #include "tree.h"
 #include "subtree_share.h"
 #include "pqueue.h"
-#include "atomic.h"
 
-/**
- * Increments the reference counter of the given diffHeap
- * @param diff_heap Pointer to the DiffHeap
- */
-void diff_heap_inc(TSDiffHeap *diff_heap) {
-  assert(diff_heap->ref_count > 0);
-  atomic_inc((volatile uint32_t *) &diff_heap->ref_count);
-  assert(diff_heap->ref_count != 0);
-}
-
-/**
- * Decrements the reference counter of the given DiffHeap
- * @param diff_heap Pointer to the DiffHeap
- * @return uint32_t New reference count
- */
-uint32_t diff_heap_dec(TSDiffHeap *diff_heap) {
-  assert(diff_heap->ref_count > 0);
-  return atomic_dec((volatile uint32_t *) &diff_heap->ref_count);
-}
 
 /**
  * Compares two sha256 hashes
@@ -113,17 +93,7 @@ void ts_diff_heap_initialize(const TSTree *tree, const char *code, const TSLiter
  */
 static void ts_diff_heap_delete_subtree(TSTreeCursor *cursor) {
   Subtree *subtree = ts_diff_heap_cursor_get_subtree(cursor);
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  // Check if subtree owns DiffHeap and decrement reference counter
-  if (diff_heap != NULL && diff_heap_dec(diff_heap) == 0) {
-    // Subtree has DiffHeap and was the last reference
-    ts_free(diff_heap->id); // free id
-    ts_free(diff_heap); // free DiffHeap
-    // Remove reference from subtree
-    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*subtree);
-    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
-    *subtree = ts_subtree_from_mut(mut_subtree);
-  }
+  *subtree = ts_diff_heap_del(*subtree);
   // Call function recursively for every child
   if (ts_diff_tree_cursor_goto_first_child(cursor)) {
     ts_diff_heap_delete_subtree(cursor);

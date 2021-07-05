@@ -12,6 +12,7 @@ extern "C" {
 #include "tree_cursor.h"
 #include "subtree_registry.h"
 #include "edit_script_buffer.h"
+#include "atomic.h"
 
 // A heap-allocated structure to hold additional attributes for the truediff algorithm
 //
@@ -62,6 +63,25 @@ uint32_t ts_real_node_child_count(TSNode);
 
 TSNode ts_real_node_child(TSNode, uint32_t);
 
+/**
+ * Increments the reference counter of the given diffHeap
+ * @param diff_heap Pointer to the DiffHeap
+ */
+static inline void diff_heap_inc(TSDiffHeap *diff_heap) {
+  assert(diff_heap->ref_count > 0);
+  atomic_inc((volatile uint32_t *) &diff_heap->ref_count);
+  assert(diff_heap->ref_count != 0);
+}
+
+/**
+ * Decrements the reference counter of the given DiffHeap
+ * @param diff_heap Pointer to the DiffHeap
+ * @return uint32_t New reference count
+ */
+static inline uint32_t diff_heap_dec(TSDiffHeap *diff_heap) {
+  assert(diff_heap->ref_count > 0);
+  return atomic_dec((volatile uint32_t *) &diff_heap->ref_count);
+}
 
 static inline void *generate_new_id() { // TODO: Is there a better way to generate URIs?
   return ts_malloc(1);
@@ -117,6 +137,26 @@ static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
   memcpy((void *) &new_diff_heap->structural_hash[0], diff_heap->structural_hash, SHA256_HASH_SIZE);
   memcpy(new_diff_heap->literal_hash, diff_heap->literal_hash, SHA256_HASH_SIZE);
   return new_diff_heap;
+}
+
+/**
+ * Remove an assigned TSDiffHeap from the passed Subtree.
+ * @param subtree Subtree with TSDiffHeap
+ * @return Subtree without TSDiffHeap
+ */
+static inline Subtree ts_diff_heap_del(Subtree subtree) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(subtree);
+  // Check if subtree owns DiffHeap and decrement reference counter
+  if (diff_heap != NULL && diff_heap_dec(diff_heap) == 0) {
+    // Subtree has DiffHeap and was the last reference
+    ts_free(diff_heap->id); // free id
+    ts_free(diff_heap); // free DiffHeap
+    // Remove reference from subtree
+    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(subtree);
+    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
+    return ts_subtree_from_mut(mut_subtree);
+  }
+  return subtree;
 }
 
 /**

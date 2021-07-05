@@ -1097,3 +1097,12 @@ bool ts_subtree_external_scanner_state_eq(Subtree self, Subtree other) {
   }
   return ts_external_scanner_state_eq(state1, state2);
 }
+
+/**
+ * Remove the assigned TSDiffHeap from the passed Subtree if available.
+ * @param self Subtree with TSDiffHeap
+ * @return Subtree without TSDiffHeap
+ */
+Subtree ts_subtree_remove_diff_heap(Subtree self){
+  return ts_diff_heap_del(self);
+}

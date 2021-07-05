@@ -204,6 +204,8 @@ static bool ts_parser__breakdown_top_of_stack(
         ts_stack_push(self->stack, slice.version, tree, false, state);
       }
 
+      // Remove assigned DiffHeap if available to prevent memory leak
+      parent = ts_subtree_remove_diff_heap(parent);
       ts_subtree_release(&self->tree_pool, parent);
       array_delete(&slice.subtrees);
 

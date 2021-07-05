@@ -166,6 +166,7 @@ void ts_subtree_print_dot_graph(Subtree, const TSLanguage *, FILE *);
 Subtree ts_subtree_last_external_token(Subtree);
 bool ts_subtree_external_scanner_state_eq(Subtree, Subtree);
 MutableSubtree ts_subtree_deepcopy(Subtree);
+Subtree ts_subtree_remove_diff_heap(Subtree);
 
 #define SUBTREE_GET(self, name) (self.data.is_inline ? self.data.name : self.ptr->name)
 
