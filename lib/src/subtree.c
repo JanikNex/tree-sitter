@@ -787,6 +787,7 @@ Subtree ts_subtree_edit(Subtree self, const TSInputEdit *edit, SubtreePool *pool
         data->depends_on_column = false;
         data->is_missing = result.data.is_missing;
         data->is_keyword = result.data.is_keyword;
+        data->diff_heap = result.data.diff_heap;
         result.ptr = data;
       }
     } else {
