@@ -30,6 +30,8 @@ struct TSDiffHeap {
     unsigned int skip_node;
     Subtree *assigned;
     Length position;
+    Length padding;
+    Length size;
 };
 
 typedef struct {
@@ -91,9 +93,11 @@ static inline void *generate_new_id() { // TODO: Is there a better way to genera
  * Creates a new TSDiffHeap with a random id
  * Allocates memory!
  * @param pos Length - Absolute position in the Sourcecode
+ * @param padding Length - Padding of the node
+ * @param size Length - Size of the node
  * @return Pointer to the new TSDiffHeap
  */
-static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
+static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length size) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
   node_diff_heap->assigned = NULL;
@@ -101,6 +105,8 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
   node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
   node_diff_heap->ref_count = 1;
+  node_diff_heap->padding = padding;
+  node_diff_heap->size = size;
   return node_diff_heap;
 }
 
@@ -108,10 +114,12 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos) {
  * Creates a new TSDiffHeap with a specific id
  * Allocates memory!
  * @param pos Length - Absolute position in the Sourcecode
+ * @param padding Length - Padding of the node
+ * @param size Length - Size of the node
  * @param id Specific id (void *)
  * @return Pointer to the new TSDiffHeap
  */
-static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
+static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, Length padding, Length size, void *id) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = id;
   node_diff_heap->assigned = NULL;
@@ -119,6 +127,8 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
   node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
   node_diff_heap->ref_count = 1;
+  node_diff_heap->padding = padding;
+  node_diff_heap->size = size;
   return node_diff_heap;
 }
 
@@ -130,7 +140,7 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, void *id) {
  * @return Pointer to the newly created TSDiffHeap
  */
 static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
-  TSDiffHeap *new_diff_heap = ts_diff_heap_new(diff_heap->position);
+  TSDiffHeap *new_diff_heap = ts_diff_heap_new(diff_heap->position, LENGTH_UNDEFINED, LENGTH_UNDEFINED);
   new_diff_heap->skip_node = diff_heap->skip_node;
   new_diff_heap->treeheight = diff_heap->treeheight;
   new_diff_heap->treesize = diff_heap->treesize;

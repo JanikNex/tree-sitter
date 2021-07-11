@@ -22,16 +22,20 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
   TSNode node = ts_tree_cursor_current_node(cursor);
   Subtree *subtree = (Subtree *) node.id;
   Length node_position = {.bytes=node.context[0], .extent={.row=node.context[1], .column=node.context[2]}};
+  Length node_size = ts_subtree_size(*subtree);
+  Length node_padding = ts_subtree_padding(*subtree);
 
   // Check if there is already an assigned DiffHeap -> reuse and update
   if (node.diff_heap != NULL) {
     TSDiffHeap *existing_diff_heap = ts_subtree_node_diff_heap(*subtree);
     existing_diff_heap->position = node_position;
+    existing_diff_heap->padding = node_padding;
+    existing_diff_heap->size = node_size;
     return existing_diff_heap;
   }
 
   // Create new TSDiffHeap
-  TSDiffHeap *node_diff_heap = ts_diff_heap_new(node_position);
+  TSDiffHeap *node_diff_heap = ts_diff_heap_new(node_position, node_padding, node_size);
 
   //Prepare for hashing
   SHA256_Context structural_context;
@@ -331,27 +335,27 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
                     ts_literal_map_is_literal(literal_map, ts_node_symbol(other));
   Subtree *self_subtree = (Subtree *) self.id;
   Subtree *other_subtree = (Subtree *) other.id;
-  Length old_size = ts_subtree_size(*self_subtree);
-  Length new_size = ts_subtree_size(*other_subtree);
-  Length self_padding = ts_subtree_padding(*self_subtree);
-  Length other_padding = ts_subtree_padding(*other_subtree);
   TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
-  const Length *self_position = &self_diff_heap->position;
-  const Length *other_position = &other_diff_heap->position;
+  const Length old_size = self_diff_heap->size;
+  const Length new_size = other_diff_heap->size;
+  const Length self_padding = self_diff_heap->padding;
+  const Length other_padding = self_diff_heap->padding;
+  const Length self_position = self_diff_heap->position;
+  const Length other_position = other_diff_heap->position;
   if (is_literal) { // are those nodes literals
     // Perform update if the length or the content of the literal changed
     if (!length_equal(old_size, new_size) ||
-        0 != memcmp(((self_code) + self_position->bytes),
-                    ((other_code) + other_position->bytes),
+        0 != memcmp(((self_code) + self_position.bytes),
+                    ((other_code) + other_position.bytes),
                     old_size.bytes)) {
       Update update_data = { // create update
         .id=self.diff_heap->id,
         .tag=ts_subtree_symbol(*self_subtree),
-        .old_start=*self_position,
+        .old_start=self_position,
         .old_size=old_size,
         .old_padding=self_padding,
-        .new_start=*other_position,
+        .new_start=other_position,
         .new_size=new_size,
         .new_padding=other_padding
       };
@@ -379,7 +383,9 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   }
   // copy literal hash from the changed to to reflect possible literal changes
   memcpy(self_diff_heap->literal_hash, other_diff_heap->literal_hash, SHA256_HASH_SIZE);
-  self_diff_heap->position = *other_position;
+  self_diff_heap->position = other_position;
+  self_diff_heap->padding = other_padding;
+  self_diff_heap->size = new_size;
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
   self_diff_heap->share = NULL;
@@ -550,7 +556,10 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
   other_diff_heap->share = NULL;
   void *new_id = generate_new_id(); // generate new ID for the new subtree
   Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
-  TSDiffHeap *new_node_diff_heap = ts_diff_heap_new_with_id(node_position, new_id); // create new DiffHeap
+  Length node_padding = ts_subtree_padding(*other_subtree);
+  Length node_size = ts_subtree_size(*other_subtree);
+  TSDiffHeap *new_node_diff_heap = ts_diff_heap_new_with_id(node_position, node_padding, node_size,
+                                                            new_id); // create new DiffHeap
   SHA256_Context structural_context;
   SHA256_Context literal_context;
   ts_diff_heap_hash_init(&structural_context, &literal_context, &other, literal_map, other_code); // init hash
@@ -837,6 +846,14 @@ void ts_reconstruction_test(const TSNode n1, const TSNode n2) {
   }
   if (!length_equal(d1->position, d2->position)) {
     printf("[%p | %p] DiffHeap Position mismatch\n", d1->id, d2->id);
+    return;
+  }
+  if (!length_equal(d1->size, d2->size)) {
+    printf("[%p | %p] DiffHeap Size mismatch\n", d1->id, d2->id);
+    return;
+  }
+  if (!length_equal(d1->padding, d2->padding)) {
+    printf("[%p | %p] DiffHeap Padding mismatch\n", d1->id, d2->id);
     return;
   }
   if (d1->treeheight != d2->treeheight) {
