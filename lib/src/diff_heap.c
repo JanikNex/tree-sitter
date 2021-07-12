@@ -31,6 +31,14 @@ ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
     existing_diff_heap->position = node_position;
     existing_diff_heap->padding = node_padding;
     existing_diff_heap->size = node_size;
+    printf("UPDATE DIFF HEAP %p (Size %d)\n", existing_diff_heap->id, existing_diff_heap->size.bytes);
+    if (ts_diff_tree_cursor_goto_first_child(cursor)) {
+      ts_diff_heap_initialize_subtree(cursor, code, literal_map);
+      while (ts_diff_tree_cursor_goto_next_sibling(cursor)) {
+        ts_diff_heap_initialize_subtree(cursor, code, literal_map);
+      }
+      ts_diff_tree_cursor_goto_parent(cursor);
+    }
     return existing_diff_heap;
   }
 
