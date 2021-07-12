@@ -320,7 +320,7 @@ MutableSubtree ts_subtree_deepcopy(Subtree self){
   for (uint32_t i = 0; i < ts_subtree_child_count(self); i++) {
     Subtree child = ts_subtree_children(self)[i];
     MutableSubtree child_copy = ts_subtree_deepcopy(child);
-    ts_subtree_children(self)[i] = ts_subtree_from_mut(child_copy);
+    ts_subtree_children(mut_copy)[i] = ts_subtree_from_mut(child_copy);
     if (!child.data.is_inline){
       atomic_dec((volatile uint32_t *)&child.ptr->ref_count);
     }
