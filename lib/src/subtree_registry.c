@@ -1,4 +1,5 @@
 #include "alloc.h"
+#include "assert.h"
 #include "subtree_registry.h"
 #include "diff_heap.h"
 #include "subtree_share.h"
@@ -10,6 +11,7 @@
 SubtreeRegistry *ts_subtree_registry_create() {
   SubtreeRegistry *reg = ts_malloc(sizeof(SubtreeRegistry));
   reg->subtrees = raxNew();
+  hashmap_create(16, &reg->inc_registry);
   return reg;
 }
 
@@ -19,6 +21,7 @@ SubtreeRegistry *ts_subtree_registry_create() {
  */
 void ts_subtree_registry_delete(SubtreeRegistry *self) {
   raxFree(self->subtrees);
+  hashmap_destroy(&self->inc_registry);
   ts_free(self);
 }
 
@@ -81,4 +84,28 @@ SubtreeShare *ts_subtree_registry_assign_share_and_register_tree(const SubtreeRe
   SubtreeShare *share = ts_subtree_registry_assign_share(self, subtree);
   ts_subtree_share_register_available_tree(share, subtree);
   return share;
+}
+
+/**
+ * Search for a preemptive assignment made in the IncrementalRegistry. If there is
+ * an entry for the counterpart of the current node, the corresponding subtree is
+ * returned. If there is no entry, a new one is created for the current node and
+ * NULL is returned.
+ * @param self Pointer to the SubtreeRegistry
+ * @param subtree Pointer to the current Subtree
+ * @return Pointer to the preemptively assigned Subtree or NULL if none was found
+ */
+Subtree *ts_inc_registry_find_assignment(SubtreeRegistry *self, Subtree *subtree) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  assert(diff_heap->is_preemptive_assigned);
+  Subtree *found_subtree = (Subtree *) hashmap_get(&self->inc_registry,
+                                                   (char *) &diff_heap->preemptive_assignment,
+                                                   sizeof(void *));
+  if (found_subtree == NULL) {
+    hashmap_put(&self->inc_registry, (char *) &diff_heap->id, sizeof(void *), subtree);
+    return NULL;
+  } else {
+    hashmap_remove(&self->inc_registry, (char *) &diff_heap->preemptive_assignment, sizeof(void *));
+  }
+  return found_subtree;
 }

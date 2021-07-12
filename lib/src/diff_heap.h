@@ -21,14 +21,18 @@ extern "C" {
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
 struct TSDiffHeap {
     void *id;
+    bool skip_node;
+    bool is_preemptive_assigned;
     volatile uint32_t ref_count;
     const unsigned char structural_hash[SHA256_HASH_SIZE];
     unsigned char literal_hash[SHA256_HASH_SIZE];
     unsigned int treeheight;
     unsigned int treesize;
     SubtreeShare *share;
-    unsigned int skip_node;
-    Subtree *assigned;
+    union {
+        void *preemptive_assignment;
+        Subtree *assigned;
+    };
     Length position;
     Length padding;
     Length size;
@@ -100,9 +104,10 @@ static inline void *generate_new_id() { // TODO: Is there a better way to genera
 static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length size) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
+  node_diff_heap->is_preemptive_assigned = false;
+  node_diff_heap->skip_node = false;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
-  node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
   node_diff_heap->ref_count = 1;
   node_diff_heap->padding = padding;
@@ -122,9 +127,10 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length si
 static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, Length padding, Length size, void *id) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = id;
+  node_diff_heap->skip_node = false;
+  node_diff_heap->is_preemptive_assigned = false;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
-  node_diff_heap->skip_node = 0;
   node_diff_heap->position = pos;
   node_diff_heap->ref_count = 1;
   node_diff_heap->padding = padding;
@@ -167,6 +173,27 @@ static inline Subtree ts_diff_heap_del(Subtree subtree) {
     return ts_subtree_from_mut(mut_subtree);
   }
   return subtree;
+}
+
+/**
+ * Check the incremental registry of the SubtreeRegistry to see whether a counterpart
+ * for preemptive assignment is already known. If so, the preemptive assignment is
+ * converted into an actual assignment.
+ * @param registry Pointer to the SubtreeRegistry
+ * @param this_subtree Pointer to the current Subtree
+ * @param this_diff_heap Pointer to the TSDiffHeap of the current Subtree
+ */
+static inline void
+try_preemptive_assignment(SubtreeRegistry *registry, Subtree *this_subtree, TSDiffHeap *this_diff_heap) {
+  Subtree *assigned_subtree = ts_subtree_registry_find_incremental_assignment(registry, this_subtree);
+  if (assigned_subtree != NULL) {
+    TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*assigned_subtree);
+    printf("Executed preemptive assignment %p -> %p\n", this_diff_heap->id, assigned_diff_heap->id);
+    this_diff_heap->is_preemptive_assigned = false;
+    this_diff_heap->assigned = assigned_subtree;
+    assigned_diff_heap->is_preemptive_assigned = false;
+    assigned_diff_heap->assigned = this_subtree;
+  }
 }
 
 /**
@@ -262,26 +289,18 @@ static inline Subtree *ts_diff_heap_cursor_get_subtree(const TSTreeCursor *curso
  * @param node TSNode
  * @param registry Pointer to the SubtreeRegistry
  */
-static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *registry) {
-  TSTreeCursor cursor = ts_tree_cursor_new(node);
-  int lvl = 0;
-  Subtree *subtree;
-  do {
-    if (lvl != 0) {
-      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-      ts_subtree_registry_assign_share(registry, subtree);
+static inline void
+foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
+    Subtree *child = &ts_subtree_children(*subtree)[i];
+    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*child);
+    if (diff_heap->is_preemptive_assigned) {
+      try_preemptive_assignment(registry, child, diff_heap);
+    } else {
+      ts_subtree_registry_assign_share(registry, child);
+      foreach_subtree_assign_share(child, registry);
     }
-    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-      lvl++;
-      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-      ts_subtree_registry_assign_share(registry, subtree);
-    }
-    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
-      lvl--;
-      ts_diff_tree_cursor_goto_parent(&cursor);
-    }
-  } while (lvl > 0);
-  ts_tree_cursor_delete(&cursor);
+  }
 }
 
 /**
@@ -289,40 +308,36 @@ static inline void foreach_subtree_assign_share(TSNode node, SubtreeRegistry *re
  * @param node
  * @param registry
  */
-static inline void foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
-  const TSDiffHeap *diff_heap = node.diff_heap;
-  if (!diff_heap->skip_node) {
-    Subtree *subtree = (Subtree *) node.id;
-    ts_subtree_registry_assign_share(registry, subtree);
+static inline void
+foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
+  Subtree *subtree = (Subtree *) node.id;
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  if (diff_heap->is_preemptive_assigned) {
+    try_preemptive_assignment(registry, subtree, diff_heap);
+  } else {
+    if (!diff_heap->skip_node) {
+      ts_subtree_registry_assign_share(registry, subtree);
+    }
+    foreach_subtree_assign_share(subtree, registry);
   }
-  foreach_subtree_assign_share(node, registry);
-};
+}
 
 /**
  * Assigns a share to each sub-tree and registers it as an available tree (excluding the root)
  * @param node TSNode
  * @param registry Pointer to the SubtreeRegistry
  */
-static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
-  TSTreeCursor cursor = ts_tree_cursor_new(node);
-  int lvl = 0;
-  Subtree *subtree;
-  do {
-    if (lvl != 0) {
-      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtree, SubtreeRegistry *registry) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
+    Subtree *child = &ts_subtree_children(*subtree)[i];
+    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*child);
+    if (diff_heap->is_preemptive_assigned) {
+      try_preemptive_assignment(registry, child, diff_heap);
+    } else {
+      ts_subtree_registry_assign_share_and_register_tree(registry, child);
+      foreach_subtree_assign_share_and_register_tree(child, registry);
     }
-    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-      lvl++;
-      subtree = ts_diff_heap_cursor_get_subtree(&cursor);
-      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
-    }
-    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
-      lvl--;
-      ts_diff_tree_cursor_goto_parent(&cursor);
-    }
-  } while (lvl > 0);
-  ts_tree_cursor_delete(&cursor);
+  }
 }
 
 /**
@@ -330,14 +345,19 @@ static inline void foreach_subtree_assign_share_and_register_tree(TSNode node, S
  * @param node TSNode
  * @param registry Pointer to the SubtreeRegistry
  */
-static inline void foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
-  const TSDiffHeap *diff_heap = node.diff_heap;
-  if (!diff_heap->skip_node) {
-    Subtree *subtree = (Subtree *) node.id;
-    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+static inline void
+foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
+  Subtree *subtree = (Subtree *) node.id;
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  if (diff_heap->is_preemptive_assigned) {
+    try_preemptive_assignment(registry, subtree, diff_heap);
+  } else {
+    if (!diff_heap->skip_node) {
+      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
+    }
+    foreach_subtree_assign_share_and_register_tree(subtree, registry);
   }
-  foreach_subtree_assign_share_and_register_tree(node, registry);
-};
+}
 
 /**
  * Creates a new TSTreeCursor starting at the root of the given tree

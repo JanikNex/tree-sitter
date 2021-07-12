@@ -302,7 +302,7 @@ MutableSubtree ts_subtree_make_mut(SubtreePool *pool, Subtree self) {
  * @param self Root of the subtree to be copied.
  * @return MutableSubtree of the copied subtree.
  */
-MutableSubtree ts_subtree_deepcopy(Subtree self){
+MutableSubtree ts_subtree_deepcopy(Subtree self) {
   MutableSubtree mut_copy;
   if (self.data.is_inline){
     mut_copy =  ts_subtree_to_mut_unsafe(self);
@@ -321,8 +321,8 @@ MutableSubtree ts_subtree_deepcopy(Subtree self){
     Subtree child = ts_subtree_children(self)[i];
     MutableSubtree child_copy = ts_subtree_deepcopy(child);
     ts_subtree_children(mut_copy)[i] = ts_subtree_from_mut(child_copy);
-    if (!child.data.is_inline){
-      atomic_dec((volatile uint32_t *)&child.ptr->ref_count);
+    if (!child.data.is_inline) {
+      atomic_dec((volatile uint32_t *) &child.ptr->ref_count);
     }
   }
   return mut_copy;
@@ -1104,6 +1104,21 @@ bool ts_subtree_external_scanner_state_eq(Subtree self, Subtree other) {
  * @param self Subtree with TSDiffHeap
  * @return Subtree without TSDiffHeap
  */
-Subtree ts_subtree_remove_diff_heap(Subtree self){
+Subtree ts_subtree_remove_diff_heap(Subtree self) {
   return ts_diff_heap_del(self);
+}
+
+/**
+ * Creates a preemptive assignment between two subtrees.
+ * @param original Original subtree
+ * @param self Copied subtree
+ */
+void ts_subtree_preemptive_assign(Subtree original, Subtree self) {
+  TSDiffHeap *original_diff_heap = ts_subtree_node_diff_heap(original);
+  TSDiffHeap *copied_diff_Heap = ts_subtree_node_diff_heap(self);
+  printf("PREEMPTIVE ASSIGNMENT %p -> %p\n", original_diff_heap->id, copied_diff_Heap->id);
+  copied_diff_Heap->is_preemptive_assigned = true;
+  copied_diff_Heap->preemptive_assignment = original_diff_heap->id;
+  original_diff_heap->is_preemptive_assigned = true;
+  original_diff_heap->preemptive_assignment = copied_diff_Heap->id;
 }

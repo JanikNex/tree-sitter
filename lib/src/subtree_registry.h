@@ -2,11 +2,13 @@
 #define TREE_SITTER_SUBTREE_REGISTRY_H
 
 #include "rax/rax.h"
+#include "hashmap/hashmap.h"
 #include "tree_sitter/api.h"
 #include "subtree.h"
 
 typedef struct {
     rax *subtrees;
+    struct hashmap_s inc_registry;
 } SubtreeRegistry;
 
 typedef struct {
@@ -23,5 +25,7 @@ void ts_subtree_registry_clean_delete(SubtreeRegistry *);
 SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *, Subtree *);
 
 SubtreeShare *ts_subtree_registry_assign_share_and_register_tree(const SubtreeRegistry *, Subtree *);
+
+Subtree *ts_subtree_registry_find_incremental_assignment(SubtreeRegistry *, Subtree *);
 
 #endif //TREE_SITTER_SUBTREE_REGISTRY_H

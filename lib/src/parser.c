@@ -796,7 +796,9 @@ static Subtree ts_parser__diffable_subtree_reuse(Subtree root, bool extra) {
   if (!root.data.is_inline){
     atomic_dec((volatile uint32_t *)&root.ptr->ref_count);
   }
-  return ts_subtree_from_mut(deep_copy_root);
+  Subtree copied_root = ts_subtree_from_mut(deep_copy_root);
+  ts_subtree_preemptive_assign(root, copied_root);
+  return copied_root;
 }
 
 static void ts_parser__shift(

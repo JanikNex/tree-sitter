@@ -246,7 +246,7 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
     // Reset all assignments and reassign shares
     diff_heap->assigned = NULL;
     assigned_diff_heap->assigned = NULL;
-    TSNode assigned_node = ts_diff_heap_node(assigned_subtree, node.tree);
-    foreach_tree_assign_share(assigned_node, registry);
+    // TSNode assigned_node = ts_diff_heap_node(assigned_subtree, node.tree);
+    // foreach_tree_assign_share(assigned_node, registry); //TODO: Why do we do this here?
   }
 }

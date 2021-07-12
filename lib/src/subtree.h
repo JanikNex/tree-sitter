@@ -167,6 +167,7 @@ Subtree ts_subtree_last_external_token(Subtree);
 bool ts_subtree_external_scanner_state_eq(Subtree, Subtree);
 MutableSubtree ts_subtree_deepcopy(Subtree);
 Subtree ts_subtree_remove_diff_heap(Subtree);
+void ts_subtree_preemptive_assign(Subtree, Subtree);
 
 #define SUBTREE_GET(self, name) (self.data.is_inline ? self.data.name : self.ptr->name)
 
