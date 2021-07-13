@@ -188,7 +188,6 @@ try_preemptive_assignment(SubtreeRegistry *registry, Subtree *this_subtree, TSDi
   Subtree *assigned_subtree = ts_subtree_registry_find_incremental_assignment(registry, this_subtree);
   if (assigned_subtree != NULL) {
     TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*assigned_subtree);
-    printf("Executed preemptive assignment %p -> %p\n", this_diff_heap->id, assigned_diff_heap->id);
     this_diff_heap->is_preemptive_assigned = false;
     this_diff_heap->assigned = assigned_subtree;
     assigned_diff_heap->is_preemptive_assigned = false;
