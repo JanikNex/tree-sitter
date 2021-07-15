@@ -836,83 +836,92 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
   return (TSDiffResult) {.constructed_tree=result, .edit_script=edit_script, .success=success};
 }
 
-void ts_reconstruction_test(const TSNode n1, const TSNode n2) {
+/**
+ * Checks every important attribute of two subtrees starting at the given nodes.
+ *
+ * @param n1 Node in the original edited tree
+ * @param n2 Node in the reconstructed tree
+ * @return true if something is wrong, false otherwise
+ */
+bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
   const TSDiffHeap *d1 = n1.diff_heap;
   const TSDiffHeap *d2 = n2.diff_heap;
   const Subtree *s1 = (Subtree *) n1.id;
   const Subtree *s2 = (Subtree *) n2.id;
+  bool error = false;
   if (ts_real_node_child_count(n1) != ts_real_node_child_count(n2)) {
     printf("[%p | %p] Real node child count mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!length_equal(ts_subtree_padding(*s1), ts_subtree_padding(*s2))) {
     printf("[%p | %p] Padding mismatch %d != %d\n", d1->id, d2->id, ts_subtree_padding(*s1).bytes,
            ts_subtree_padding(*s2).bytes);
-    return;
+    error = true;
   }
   if (!length_equal(ts_subtree_size(*s1), ts_subtree_size(*s2))) {
     printf("[%p | %p] Size mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!length_equal(ts_subtree_total_size(*s1), ts_subtree_total_size(*s2))) {
     printf("[%p | %p] Total size mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (ts_subtree_symbol(*s1) != ts_subtree_symbol(*s2)) {
     printf("[%p | %p] Symbol mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (ts_subtree_production_id(*s1) != ts_subtree_production_id(*s2)) {
     printf("[%p | %p] SubtreeProductionID mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!length_equal(d1->position, d2->position)) {
     printf("[%p | %p] DiffHeap Position mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!length_equal(d1->size, d2->size)) {
     printf("[%p | %p] DiffHeap Size mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!length_equal(d1->padding, d2->padding)) {
     printf("[%p | %p] DiffHeap Padding mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (d1->treeheight != d2->treeheight) {
     printf("[%p | %p] Treeheight mismatch %d != %d\n", d1->id, d2->id, d1->treeheight, d2->treeheight);
-    return;
+    error = true;
   }
   if (d1->treesize != d2->treesize) {
     printf("[%p | %p] Treesize mismatch %d != %d\n", d1->id, d2->id, d1->treesize, d2->treesize);
-    return;
+    error = true;
   }
   if (!ts_diff_heap_hash_eq(d1->structural_hash, d2->structural_hash)) {
     printf("[%p | %p] Structural hash mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   if (!ts_diff_heap_hash_eq(d1->literal_hash, d2->literal_hash)) {
     printf("[%p | %p] Literal hash mismatch\n", d1->id, d2->id);
-    return;
+    error = true;
   }
   /*if (d1->assigned != NULL) {
     printf("[%p] Assigned not reset\n", d1->id);
-    return;
+    error = true;
   }*/
   if (d2->assigned != NULL) {
     printf("[%p] Assigned not reset\n", d2->id);
-    return;
+    error = true;
   }
   if (d1->share != NULL) {
     printf("[%p] Share not reset\n", d1->id);
-    return;
+    error = true;
   }
   if (d1->share != NULL) {
     printf("[%p] Share not reset\n", d2->id);
-    return;
+    error = true;
   }
   for (uint32_t i = 0; i < ts_real_node_child_count(n1); i++) {
     TSNode kid1 = ts_real_node_child(n1, i);
     TSNode kid2 = ts_real_node_child(n2, i);
-    ts_reconstruction_test(kid1, kid2);
+    error = ts_reconstruction_test(kid1, kid2) || error;
   }
+  return error;
 }
