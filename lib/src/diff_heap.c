@@ -360,7 +360,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   const Length old_size = self_diff_heap->size;
   const Length new_size = other_diff_heap->size;
   const Length self_padding = self_diff_heap->padding;
-  const Length other_padding = self_diff_heap->padding;
+  const Length other_padding = other_diff_heap->padding;
   const Length self_position = self_diff_heap->position;
   const Length other_position = other_diff_heap->position;
   if (is_literal) { // are those nodes literals
@@ -859,11 +859,13 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     error = true;
   }
   if (!length_equal(ts_subtree_size(*s1), ts_subtree_size(*s2))) {
-    printf("[%p | %p] Size mismatch\n", d1->id, d2->id);
+    printf("[%p | %p] Size mismatch %d != %d\n", d1->id, d2->id, ts_subtree_size(*s1).bytes,
+           ts_subtree_size(*s2).bytes);
     error = true;
   }
   if (!length_equal(ts_subtree_total_size(*s1), ts_subtree_total_size(*s2))) {
-    printf("[%p | %p] Total size mismatch\n", d1->id, d2->id);
+    printf("[%p | %p] Total size mismatch %d != %d\n", d1->id, d2->id, ts_subtree_total_size(*s1).bytes,
+           ts_subtree_total_size(*s2).bytes);
     error = true;
   }
   if (ts_subtree_symbol(*s1) != ts_subtree_symbol(*s2)) {
@@ -883,7 +885,7 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     error = true;
   }
   if (!length_equal(d1->padding, d2->padding)) {
-    printf("[%p | %p] DiffHeap Padding mismatch\n", d1->id, d2->id);
+    printf("[%p | %p] DiffHeap Padding mismatch %d != %d\n", d1->id, d2->id, d1->padding.bytes, d2->padding.bytes);
     error = true;
   }
   if (d1->treeheight != d2->treeheight) {
