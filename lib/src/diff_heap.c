@@ -1,4 +1,3 @@
-#include <printf.h>
 #include "sha_digest/sha256.h"
 #include "diff_heap.h"
 #include "tree.h"
@@ -499,6 +498,8 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     this_diff_heap->treeheight = 1 + new_treeheight;
     this_diff_heap->treesize = 1 + new_treesize;
     this_diff_heap->position = other_diff_heap->position;
+    this_diff_heap->size = other_diff_heap->size;
+    this_diff_heap->padding = other_diff_heap->padding;
     this_diff_heap->assigned = NULL;
     this_diff_heap->share = NULL;
     other_diff_heap->assigned = NULL;
