@@ -388,16 +388,19 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     }
   }
   // update node in the original tree if needed
-  if (is_literal || !length_equal(old_size, new_size) || !length_equal(self_padding, other_padding)) {
+  if (is_literal || !length_equal(old_size, new_size) || !length_equal(self_padding, other_padding) ||
+      ts_subtree_has_changes(*self_subtree)) {
     MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
     if (self_subtree->data.is_inline) {
       mut_subtree.data.padding_bytes = other_padding.bytes;
       mut_subtree.data.padding_rows = other_padding.extent.row;
       mut_subtree.data.padding_columns = other_padding.extent.column;
       mut_subtree.data.size_bytes = new_size.bytes;
+      mut_subtree.data.has_changes = false;
     } else {
       mut_subtree.ptr->padding = other_padding;
       mut_subtree.ptr->size = new_size;
+      mut_subtree.ptr->has_changes = false;
     }
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
@@ -869,7 +872,7 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     error = true;
   }
   if (ts_subtree_symbol(*s1) != ts_subtree_symbol(*s2)) {
-    printf("[%p | %p] Symbol mismatch\n", d1->id, d2->id);
+    printf("[%p | %p] Symbol mismatch %d != %d\n", d1->id, d2->id, ts_subtree_symbol(*s1), ts_subtree_symbol(*s2));
     error = true;
   }
   if (ts_subtree_production_id(*s1) != ts_subtree_production_id(*s2)) {
