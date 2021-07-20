@@ -156,6 +156,20 @@ static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
 }
 
 /**
+ * Reset a preassignment bidirectional
+ * @param diff_heap Pointer to a TSDiffHeap
+ */
+static inline void reset_preassignment(TSDiffHeap *diff_heap) {
+  assert(diff_heap->is_preemptive_assigned);
+  TSDiffHeap *assigned_diff_heap = diff_heap->preemptive_assignment;
+  assert(assigned_diff_heap->is_preemptive_assigned);
+  assigned_diff_heap->is_preemptive_assigned = false;
+  assigned_diff_heap->preemptive_assignment = NULL;
+  diff_heap->is_preemptive_assigned = false;
+  diff_heap->preemptive_assignment = NULL;
+}
+
+/**
  * Remove an assigned TSDiffHeap from the passed Subtree.
  * @param subtree Subtree with TSDiffHeap
  * @return Subtree without TSDiffHeap
@@ -164,6 +178,9 @@ static inline Subtree ts_diff_heap_del(Subtree subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(subtree);
   // Check if subtree owns DiffHeap and decrement reference counter
   if (diff_heap != NULL && diff_heap_dec(diff_heap) == 0) {
+    if (diff_heap->is_preemptive_assigned) {
+      reset_preassignment(diff_heap);
+    }
     // Subtree has DiffHeap and was the last reference
     ts_free(diff_heap->id); // free id
     ts_free(diff_heap); // free DiffHeap
