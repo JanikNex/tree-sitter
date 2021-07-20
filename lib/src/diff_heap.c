@@ -169,6 +169,23 @@ static bool is_signature_equal(TSNode this_node, TSNode that_node) {
 }
 
 /**
+ * Look into all subtrees and search for preassigned nodes. If one is found, remove the preassignment
+ * bidirectional.
+ * @param subtree Pointer to the starting subtree
+ */
+static void remove_preassignments(Subtree *subtree) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); ++i) {
+    Subtree *child = &ts_subtree_children(*subtree)[i];
+    TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
+    if (child_diff_heap->is_preemptive_assigned) {
+      reset_preassignment(child_diff_heap);
+    } else {
+      remove_preassignments(child);
+    }
+  }
+}
+
+/**
  * STEP 2 - Find reuse candidates
  *
  * Assigns shares to each subtree recursively. The current node of the original and the current node of
@@ -212,6 +229,8 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
   if (this_share != NULL && this_share == that_share) {
     // Both subtrees got the same share -> preemptive assignment
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
+    remove_preassignments(this_subtree);
+    remove_preassignments(that_subtree);
   } else {
     // Subtrees got different shares
     if (this_share != NULL && that_share != NULL && is_signature_equal(this_node, that_node)) { // check signature
@@ -320,12 +339,14 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
     }
     Subtree *subtree = entry->subtree;
     TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+    assert(!diff_heap->is_preemptive_assigned);
     if (diff_heap->skip_node) {
       continue;
     } else if (diff_heap->assigned != NULL) {
       entry->valid = false; // set invalid if assigned
     } else {
       SubtreeShare *node_share = diff_heap->share;
+      assert(node_share != NULL);
       TSNode subtree_node = ts_diff_heap_node(subtree, tree);
       // Search for possible assignable subtree
       Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree_node, preferred, registry);
@@ -409,6 +430,10 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   self_diff_heap->position = other_position;
   self_diff_heap->padding = other_padding;
   self_diff_heap->size = new_size;
+  if (self_diff_heap->is_preemptive_assigned) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
+    self_diff_heap->is_preemptive_assigned = false;
+    self_diff_heap->preemptive_assignment = NULL;
+  }
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
   self_diff_heap->share = NULL;
