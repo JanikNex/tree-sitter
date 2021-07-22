@@ -45,10 +45,6 @@ typedef Array(NodeEntry) NodeEntryArray;
 
 TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
 
-void assign_shares(TSNode, TSNode, SubtreeRegistry *);
-
-void assign_subtrees(TSNode, SubtreeRegistry *);
-
 Subtree
 compute_edit_script_recurse(TSNode, TSNode, EditScriptBuffer *, SubtreePool *, const char *, const char *,
                             const TSLiteralMap *);
@@ -57,11 +53,6 @@ Subtree
 compute_edit_script(TSNode, TSNode, void *, TSSymbol, uint32_t, EditScriptBuffer *, SubtreePool *, const char *,
                     const char *,
                     const TSLiteralMap *);
-
-void unload_unassigned(TSNode, EditScriptBuffer *);
-
-void
-select_available_tree(NodeEntryArray *, const TSTree *, bool, SubtreeRegistry *);
 
 uint32_t ts_real_node_child_count(TSNode);
 

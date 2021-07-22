@@ -183,7 +183,7 @@ static bool is_signature_equal(TSNode this_node, TSNode that_node) {
  * @param that_node Node in the changed tree
  * @param registry SubtreeRegistry to keep track of all shares
  */
-void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { // TODO: Possible without recursion?
+static void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { // TODO: Possible without recursion?
   Subtree *this_subtree = (Subtree *) this_node.id;
   Subtree *that_subtree = (Subtree *) that_node.id;
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
@@ -244,6 +244,43 @@ TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
 }
 
 /**
+ * Iterates a list of subtrees look for an assignable subtree in the registry for every subtree that is
+ * still unassigned. The preferred parameter indicated whether the literal or the structural hash should be used.
+ * @param nodes NodeEntryArray of subtrees
+ * @param tree TSTree of the changed tree
+ * @param preferred bool that indicated whether to use the structural or literal hash
+ * @param registry SubtreeRegistry
+ */
+static inline void
+select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool preferred, SubtreeRegistry *registry) {
+  for (uint32_t i = 0; i < nodes->size; i++) { // iterate all array elements
+    NodeEntry *entry = array_get(nodes, i);
+    if (!entry->valid) { // TODO: sort by validity to speed up iterations
+      continue; // skip if already processed
+    }
+    Subtree *subtree = entry->subtree;
+    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+    if (diff_heap->skip_node) {
+      continue;
+    } else if (diff_heap->assigned != NULL) {
+      entry->valid = false; // set invalid if assigned
+    } else {
+      SubtreeShare *node_share = diff_heap->share;
+      assert(node_share != NULL);
+      TSNode subtree_node = ts_diff_heap_node(subtree, tree);
+      // Search for possible assignable subtree
+      Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree_node, preferred, registry);
+      if (available_tree != NULL) {
+        // assign tree, if an assignable subtree was found
+        TSDiffHeap *available_diff_heap = ts_subtree_node_diff_heap(*available_tree);
+        assign_tree(available_tree, subtree, available_diff_heap, diff_heap);
+        entry->valid = false;
+      }
+    }
+  }
+}
+
+/**
  * STEP 3 - Select reuse candidates
  *
  * Creates a priority queue and starts with the first node of the changed tree.
@@ -254,7 +291,7 @@ TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
  * @param that_node Root-Node of the changed tree
  * @param registry SubtreeRegistry
  */
-void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
+static void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
   PriorityQueue *queue = priority_queue_create(); // create queue
   priority_queue_insert(queue, (Subtree *) that_node.id); // insert the subtree of the node
   NodeEntryArray next_nodes = array_new(); // create array as working list
@@ -289,42 +326,6 @@ void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
   priority_queue_destroy(queue);
 }
 
-/**
- * Iterates a list of subtrees look for an assignable subtree in the registry for every subtree that is
- * still unassigned. The preferred parameter indicated whether the literal or the structural hash should be used.
- * @param nodes NodeEntryArray of subtrees
- * @param tree TSTree of the changed tree
- * @param preferred bool that indicated whether to use the structural or literal hash
- * @param registry SubtreeRegistry
- */
-void
-select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool preferred, SubtreeRegistry *registry) {
-  for (uint32_t i = 0; i < nodes->size; i++) { // iterate all array elements
-    NodeEntry *entry = array_get(nodes, i);
-    if (!entry->valid) { // TODO: sort by validity to speed up iterations
-      continue; // skip if already processed
-    }
-    Subtree *subtree = entry->subtree;
-    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-    if (diff_heap->skip_node) {
-      continue;
-    } else if (diff_heap->assigned != NULL) {
-      entry->valid = false; // set invalid if assigned
-    } else {
-      SubtreeShare *node_share = diff_heap->share;
-      assert(node_share != NULL);
-      TSNode subtree_node = ts_diff_heap_node(subtree, tree);
-      // Search for possible assignable subtree
-      Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree_node, preferred, registry);
-      if (available_tree != NULL) {
-        // assign tree, if an assignable subtree was found
-        TSDiffHeap *available_diff_heap = ts_subtree_node_diff_heap(*available_tree);
-        assign_tree(available_tree, subtree, available_diff_heap, diff_heap);
-        entry->valid = false;
-      }
-    }
-  }
-}
 
 /**
  * Compares two nodes and performs an update of the original node if needed
@@ -515,7 +516,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
  * @param self TSNode in the original tree
  * @param buffer Pointer to the EditScriptBuffer
  */
-void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
+static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
   Subtree *self_subtree = (Subtree *) self.id;
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   this_diff_heap->share = NULL; // reset share
