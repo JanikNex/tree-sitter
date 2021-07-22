@@ -29,10 +29,8 @@ struct TSDiffHeap {
   unsigned int treeheight;
   unsigned int treesize;
   SubtreeShare *share;
-  union {
-    void *preemptive_assignment;
-    Subtree *assigned;
-  };
+  void *preemptive_assignment;
+  Subtree *assigned;
   Length position;
   Length padding;
   Length size;
