@@ -2,7 +2,7 @@
 #include "diff_heap.h"
 
 typedef struct {
-    Subtree *subtree;
+  Subtree *subtree;
 } HashmapResult;
 
 /**
@@ -241,7 +241,6 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
     share = NULL;
     deregister_foreach_subtree(node, registry);
   } else if (diff_heap->assigned != NULL) {
-    assert(!diff_heap->is_preemptive_assigned);
     // Subtree has been taken previously but was part of a larger subtree
     Subtree *assigned_subtree = diff_heap->assigned;
     TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*assigned_subtree);

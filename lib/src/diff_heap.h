@@ -20,27 +20,27 @@ extern "C" {
 // that holds any additional data that is only needed by truediff. Thereby the size
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
 struct TSDiffHeap {
-    void *id;
-    bool skip_node;
-    bool is_preemptive_assigned;
-    volatile uint32_t ref_count;
-    const unsigned char structural_hash[SHA256_HASH_SIZE];
-    unsigned char literal_hash[SHA256_HASH_SIZE];
-    unsigned int treeheight;
-    unsigned int treesize;
-    SubtreeShare *share;
-    union {
-        void *preemptive_assignment;
-        Subtree *assigned;
-    };
-    Length position;
-    Length padding;
-    Length size;
+  void *id;
+  bool skip_node;
+  bool is_preemptive_assigned;
+  volatile uint32_t ref_count;
+  const unsigned char structural_hash[SHA256_HASH_SIZE];
+  unsigned char literal_hash[SHA256_HASH_SIZE];
+  unsigned int treeheight;
+  unsigned int treesize;
+  SubtreeShare *share;
+  union {
+    void *preemptive_assignment;
+    Subtree *assigned;
+  };
+  Length position;
+  Length padding;
+  Length size;
 };
 
 typedef struct {
-    Subtree *subtree;
-    bool valid;
+  Subtree *subtree;
+  bool valid;
 } NodeEntry;
 
 typedef Array(NodeEntry) NodeEntryArray;
@@ -309,13 +309,8 @@ static inline void
 foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
   for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
     Subtree *child = &ts_subtree_children(*subtree)[i];
-    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*child);
-    if (diff_heap->is_preemptive_assigned) {
-      try_preemptive_assignment(registry, child, diff_heap);
-    } else {
-      ts_subtree_registry_assign_share(registry, child);
-      foreach_subtree_assign_share(child, registry);
-    }
+    ts_subtree_registry_assign_share(registry, child);
+    foreach_subtree_assign_share(child, registry);
   }
 }
 
@@ -328,14 +323,10 @@ static inline void
 foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
   Subtree *subtree = (Subtree *) node.id;
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (diff_heap->is_preemptive_assigned) {
-    try_preemptive_assignment(registry, subtree, diff_heap);
-  } else {
-    if (!diff_heap->skip_node) {
-      ts_subtree_registry_assign_share(registry, subtree);
-    }
-    foreach_subtree_assign_share(subtree, registry);
+  if (!diff_heap->skip_node) {
+    ts_subtree_registry_assign_share(registry, subtree);
   }
+  foreach_subtree_assign_share(subtree, registry);
 }
 
 /**
@@ -346,13 +337,9 @@ foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
 static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtree, SubtreeRegistry *registry) {
   for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
     Subtree *child = &ts_subtree_children(*subtree)[i];
-    TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*child);
-    if (diff_heap->is_preemptive_assigned) {
-      try_preemptive_assignment(registry, child, diff_heap);
-    } else {
-      ts_subtree_registry_assign_share_and_register_tree(registry, child);
-      foreach_subtree_assign_share_and_register_tree(child, registry);
-    }
+    ts_subtree_registry_assign_share_and_register_tree(registry, child);
+    foreach_subtree_assign_share_and_register_tree(child, registry);
+
   }
 }
 
@@ -365,14 +352,10 @@ static inline void
 foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
   Subtree *subtree = (Subtree *) node.id;
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (diff_heap->is_preemptive_assigned) {
-    try_preemptive_assignment(registry, subtree, diff_heap);
-  } else {
-    if (!diff_heap->skip_node) {
-      ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
-    }
-    foreach_subtree_assign_share_and_register_tree(subtree, registry);
+  if (!diff_heap->skip_node) {
+    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
   }
+  foreach_subtree_assign_share_and_register_tree(subtree, registry);
 }
 
 /**

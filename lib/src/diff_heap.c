@@ -169,23 +169,6 @@ static bool is_signature_equal(TSNode this_node, TSNode that_node) {
 }
 
 /**
- * Look into all subtrees and search for preassigned nodes. If one is found, remove the preassignment
- * bidirectional.
- * @param subtree Pointer to the starting subtree
- */
-static void remove_preassignments(Subtree *subtree) {
-  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); ++i) {
-    Subtree *child = &ts_subtree_children(*subtree)[i];
-    TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
-    if (child_diff_heap->is_preemptive_assigned) {
-      reset_preassignment(child_diff_heap);
-    } else {
-      remove_preassignments(child);
-    }
-  }
-}
-
-/**
  * STEP 2 - Find reuse candidates
  *
  * Assigns shares to each subtree recursively. The current node of the original and the current node of
@@ -214,26 +197,14 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
     return;
   }
   // Assign shares or look into the IncrementalRegistry and search for an assignment if preemptive_assigned
-  SubtreeShare *this_share = NULL;
-  SubtreeShare *that_share = NULL;
-  if (this_diff_heap->is_preemptive_assigned) {
-    try_preemptive_assignment(registry, this_subtree, this_diff_heap);
-  } else {
-    this_share = ts_subtree_registry_assign_share(registry, this_subtree);
-  }
-  if (that_diff_heap->is_preemptive_assigned) {
-    try_preemptive_assignment(registry, that_subtree, that_diff_heap);
-  } else {
-    that_share = ts_subtree_registry_assign_share(registry, that_subtree);
-  }
-  if (this_share != NULL && this_share == that_share) {
+  SubtreeShare *this_share = ts_subtree_registry_assign_share(registry, this_subtree);
+  SubtreeShare *that_share = ts_subtree_registry_assign_share(registry, that_subtree);
+  if (this_share == that_share) {
     // Both subtrees got the same share -> preemptive assignment
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
-    remove_preassignments(this_subtree);
-    remove_preassignments(that_subtree);
   } else {
     // Subtrees got different shares
-    if (this_share != NULL && that_share != NULL && is_signature_equal(this_node, that_node)) { // check signature
+    if (is_signature_equal(this_node, that_node)) { // check signature
       // Signatures are equal -> recurse simultaneously
       uint32_t this_child_count = ts_real_node_child_count(this_node);
       ts_subtree_share_register_available_tree(this_share, this_subtree);
@@ -244,12 +215,8 @@ void assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry
       }
     } else {
       // Signatures are not equal -> recurse separately
-      if (this_share != NULL) {
-        foreach_tree_assign_share_and_register_tree(this_node, registry);
-      }
-      if (that_share != NULL) {
-        foreach_subtree_assign_share(that_subtree, registry);
-      }
+      foreach_tree_assign_share_and_register_tree(this_node, registry);
+      foreach_subtree_assign_share(that_subtree, registry);
     }
   }
 
@@ -339,7 +306,6 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
     }
     Subtree *subtree = entry->subtree;
     TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-    assert(!diff_heap->is_preemptive_assigned);
     if (diff_heap->skip_node) {
       continue;
     } else if (diff_heap->assigned != NULL) {
@@ -431,8 +397,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   self_diff_heap->padding = other_padding;
   self_diff_heap->size = new_size;
   if (self_diff_heap->is_preemptive_assigned) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
-    self_diff_heap->is_preemptive_assigned = false;
-    self_diff_heap->preemptive_assignment = NULL;
+    reset_preassignment(self_diff_heap);
   }
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
   diff_heap_inc(self_diff_heap);
@@ -468,7 +433,8 @@ update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const 
       update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
     }
     while (
-      !(ts_diff_tree_cursor_goto_next_sibling(&self_cursor) && ts_diff_tree_cursor_goto_next_sibling(&other_cursor)) &&
+      !(ts_diff_tree_cursor_goto_next_sibling(&self_cursor) &&
+        ts_diff_tree_cursor_goto_next_sibling(&other_cursor)) &&
       lvl > 0) {
       lvl--;
       ts_diff_tree_cursor_goto_parent(&self_cursor);
