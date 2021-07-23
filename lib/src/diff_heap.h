@@ -22,14 +22,13 @@ extern "C" {
 struct TSDiffHeap {
   void *id;
   bool skip_node;
-  bool is_preemptive_assigned;
   volatile uint32_t ref_count;
   const unsigned char structural_hash[SHA256_HASH_SIZE];
   unsigned char literal_hash[SHA256_HASH_SIZE];
   unsigned int treeheight;
   unsigned int treesize;
   SubtreeShare *share;
-  void *preemptive_assignment;
+  TSDiffHeap *preemptive_assignment;
   Subtree *assigned;
   Length position;
   Length padding;
@@ -93,7 +92,7 @@ static inline void *generate_new_id() { // TODO: Is there a better way to genera
 static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length size) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
-  node_diff_heap->is_preemptive_assigned = false;
+  node_diff_heap->preemptive_assignment = NULL;
   node_diff_heap->skip_node = false;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
@@ -117,7 +116,7 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, Length padding, L
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = id;
   node_diff_heap->skip_node = false;
-  node_diff_heap->is_preemptive_assigned = false;
+  node_diff_heap->preemptive_assignment = NULL;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
   node_diff_heap->position = pos;
@@ -149,12 +148,10 @@ static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
  * @param diff_heap Pointer to a TSDiffHeap
  */
 static inline void reset_preassignment(TSDiffHeap *diff_heap) {
-  assert(diff_heap->is_preemptive_assigned);
+  assert(diff_heap->preemptive_assignment != NULL);
   TSDiffHeap *assigned_diff_heap = diff_heap->preemptive_assignment;
-  assert(assigned_diff_heap->is_preemptive_assigned);
-  assigned_diff_heap->is_preemptive_assigned = false;
+  assert(assigned_diff_heap->preemptive_assignment != NULL);
   assigned_diff_heap->preemptive_assignment = NULL;
-  diff_heap->is_preemptive_assigned = false;
   diff_heap->preemptive_assignment = NULL;
 }
 
@@ -167,7 +164,7 @@ static inline Subtree ts_diff_heap_del(Subtree subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(subtree);
   // Check if subtree owns DiffHeap and decrement reference counter
   if (diff_heap != NULL && diff_heap_dec(diff_heap) == 0) {
-    if (diff_heap->is_preemptive_assigned) {
+    if (diff_heap->preemptive_assignment != NULL) {
       reset_preassignment(diff_heap);
     }
     // Subtree has DiffHeap and was the last reference
@@ -194,10 +191,10 @@ try_preemptive_assignment(SubtreeRegistry *registry, Subtree *this_subtree, TSDi
   Subtree *assigned_subtree = ts_subtree_registry_find_incremental_assignment(registry, this_subtree);
   if (assigned_subtree != NULL) {
     TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*assigned_subtree);
-    this_diff_heap->is_preemptive_assigned = false;
     this_diff_heap->assigned = assigned_subtree;
-    assigned_diff_heap->is_preemptive_assigned = false;
+    this_diff_heap->preemptive_assignment = NULL;
     assigned_diff_heap->assigned = this_subtree;
+    assigned_diff_heap->preemptive_assignment = NULL;
   }
 }
 

@@ -404,7 +404,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   self_diff_heap->position = other_position;
   self_diff_heap->padding = other_padding;
   self_diff_heap->size = new_size;
-  if (self_diff_heap->is_preemptive_assigned) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
+  if (self_diff_heap->preemptive_assignment != NULL) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
     reset_preassignment(self_diff_heap);
   }
   // increment the DiffHeap reference counter since this node is reused in the constructed tree

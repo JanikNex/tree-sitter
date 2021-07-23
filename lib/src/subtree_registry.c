@@ -97,7 +97,7 @@ SubtreeShare *ts_subtree_registry_assign_share_and_register_tree(const SubtreeRe
  */
 Subtree *ts_subtree_registry_find_incremental_assignment(SubtreeRegistry *self, Subtree *subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  assert(diff_heap->is_preemptive_assigned);
+  assert(diff_heap->preemptive_assignment != NULL);
   TSDiffHeap *target_diff_heap = (TSDiffHeap *) diff_heap->preemptive_assignment;
   Subtree *found_subtree = (Subtree *) hashmap_get(&self->inc_registry, (char *) &target_diff_heap->id, sizeof(void *));
   if (found_subtree == NULL) {

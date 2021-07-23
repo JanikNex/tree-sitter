@@ -1116,8 +1116,6 @@ Subtree ts_subtree_remove_diff_heap(Subtree self) {
 void ts_subtree_preemptive_assign(Subtree original, Subtree self) {
   TSDiffHeap *original_diff_heap = ts_subtree_node_diff_heap(original);
   TSDiffHeap *copied_diff_Heap = ts_subtree_node_diff_heap(self);
-  copied_diff_Heap->is_preemptive_assigned = true;
   copied_diff_Heap->preemptive_assignment = original_diff_heap;
-  original_diff_heap->is_preemptive_assigned = true;
   original_diff_heap->preemptive_assignment = copied_diff_Heap;
 }
