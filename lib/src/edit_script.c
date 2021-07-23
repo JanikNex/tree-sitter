@@ -36,9 +36,13 @@ static inline void print__edit_script(const TSLanguage *language, const EditScri
     SugaredEdit *edit = array_get(&edit_array, i);
     switch (edit->edit_tag) {
       case UPDATE:
-        printf("[UPDATE | %p] Old literal from %d (%d) [-> %d] => New literal from %d (%d) [-> %d]\n", edit->update.id,
-               edit->update.old_start.bytes, edit->update.old_size.bytes, edit->update.old_padding.bytes,
-               edit->update.new_start.bytes, edit->update.new_size.bytes, edit->update.new_padding.bytes);
+        printf("[UPDATE | %p] Old literal from %d (%d) => New literal from %d (%d)\n", edit->update.id,
+               edit->update.old_start.bytes, edit->update.old_size.bytes,
+               edit->update.new_start.bytes, edit->update.new_size.bytes);
+        break;
+      case UPDATE_PADDING:
+        printf("[UPDATE PADDING | %p] Update padding from %d to %d\n", edit->update_padding.id,
+               edit->update_padding.old_padding.bytes, edit->update_padding.new_padding.bytes);
         break;
       case LOAD:
         if (!is_relevant(minimized, language, edit->load.tag)) {
@@ -196,6 +200,10 @@ CoreEditArray edit_as_core_edit(SugaredEdit edit) {
   switch (edit.edit_tag) {
     case UPDATE:
       ce1 = (CoreEdit) {.edit_tag=CORE_UPDATE, .update=edit.update};
+      array_push(&result, ce1);
+      break;
+    case UPDATE_PADDING:
+      ce1 = (CoreEdit) {.edit_tag=CORE_UPDATE_PADDING, .update_padding=edit.update_padding};
       array_push(&result, ce1);
       break;
     case LOAD:

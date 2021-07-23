@@ -23,6 +23,7 @@ void ts_edit_script_buffer_add(EditScriptBuffer *buffer, SugaredEdit edit) {
   EditArray *neg_buff = &buffer->negative_buffer;
   switch (edit.edit_tag) {
     case UPDATE:
+    case UPDATE_PADDING:
     case LOAD:
     case LOAD_ATTACH:
       array_push(pos_buff, edit);

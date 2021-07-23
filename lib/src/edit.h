@@ -29,11 +29,11 @@ typedef struct {
 } EditNodeData;
 
 typedef enum {
-    CORE_ATTACH, CORE_DETACH, CORE_UNLOAD, CORE_LOAD, CORE_UPDATE
+    CORE_ATTACH, CORE_DETACH, CORE_UNLOAD, CORE_LOAD, CORE_UPDATE, CORE_UPDATE_PADDING
 } CoreEditTag;
 
 typedef enum {
-    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE
+    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE, UPDATE_PADDING
 } EditTag;
 
 typedef struct {
@@ -73,11 +73,16 @@ typedef struct {
     TSSymbol tag;
     Length old_start;
     Length old_size;
-    Length old_padding;
     Length new_start;
     Length new_size;
-    Length new_padding;
 } Update;
+
+typedef struct{
+  void *id;
+  TSSymbol tag;
+  Length old_padding;
+  Length new_padding;
+}UpdatePadding;
 
 typedef struct {
     bool is_leaf: 1;
@@ -109,6 +114,7 @@ typedef struct {
         Unload unload;
         Load load;
         Update update;
+        UpdatePadding update_padding;
     };
 } CoreEdit;
 
@@ -120,6 +126,7 @@ typedef struct {
         Unload unload;
         Load load;
         Update update;
+        UpdatePadding update_padding;
         LoadAttach load_attach;
         DetachUnload detach_unload;
     };

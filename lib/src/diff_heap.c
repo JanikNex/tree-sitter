@@ -352,21 +352,19 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   const Length other_padding = other_diff_heap->padding;
   const Length self_position = self_diff_heap->position;
   const Length other_position = other_diff_heap->position;
+  bool size_change = !length_equal(old_size, new_size);
+  bool padding_change = !length_equal(self_padding, other_padding);
   if (is_literal) { // are those nodes literals
     // Perform update if the length or the content of the literal changed
-    if (!length_equal(old_size, new_size) ||
-        0 != memcmp(((self_code) + self_position.bytes),
-                    ((other_code) + other_position.bytes),
-                    old_size.bytes)) {
+    if (size_change || 0 != memcmp(((self_code) + self_position.bytes), ((other_code) + other_position.bytes),
+                                   old_size.bytes)) {
       Update update_data = { // create update
         .id=self.diff_heap->id,
         .tag=ts_subtree_symbol(*self_subtree),
         .old_start=self_position,
         .old_size=old_size,
-        .old_padding=self_padding,
         .new_start=other_position,
         .new_size=new_size,
-        .new_padding=other_padding
       };
       // add update to editscript buffer
       ts_edit_script_buffer_add(buffer,
@@ -376,9 +374,17 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
                                 });
     }
   }
+  if (padding_change) { // Create UpdatePaddingEdit if the padding has been changed
+    UpdatePadding update_padding_data = {
+      .id=self.diff_heap->id,
+      .tag=ts_subtree_symbol(*self_subtree),
+      .old_padding=self_padding,
+      .new_padding=other_padding
+    };
+    ts_edit_script_buffer_add(buffer, (SugaredEdit) {.edit_tag=UPDATE_PADDING, .update_padding=update_padding_data});
+  }
   // update node in the original tree if needed
-  if (is_literal || !length_equal(old_size, new_size) || !length_equal(self_padding, other_padding) ||
-      ts_subtree_has_changes(*self_subtree)) {
+  if (is_literal || size_change || padding_change || ts_subtree_has_changes(*self_subtree)) {
     MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
     if (self_subtree->data.is_inline) {
       mut_subtree.data.padding_bytes = other_padding.bytes;
