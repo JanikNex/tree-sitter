@@ -377,7 +377,7 @@ static void ts_subtree__compress(
 void ts_subtree_balance(Subtree self, SubtreePool *pool, const TSLanguage *language) {
   array_clear(&pool->tree_stack);
 
-  if (ts_subtree_child_count(self) > 0 && self.ptr->ref_count == 1) {
+  if (ts_subtree_child_count(self) > 0 && self.ptr->ref_count == 1 && ts_subtree_node_diff_heap(self) == NULL) {
     array_push(&pool->tree_stack, ts_subtree_to_mut_unsafe(self));
   }
 
@@ -399,7 +399,7 @@ void ts_subtree_balance(Subtree self, SubtreePool *pool, const TSLanguage *langu
 
     for (uint32_t i = 0; i < tree.ptr->child_count; i++) {
       Subtree child = ts_subtree_children(tree)[i];
-      if (ts_subtree_child_count(child) > 0 && child.ptr->ref_count == 1) {
+      if (ts_subtree_child_count(child) > 0 && child.ptr->ref_count == 1 && ts_subtree_node_diff_heap(child) == NULL) {
         array_push(&pool->tree_stack, ts_subtree_to_mut_unsafe(child));
       }
     }
