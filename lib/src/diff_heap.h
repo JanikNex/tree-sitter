@@ -295,6 +295,11 @@ static inline void
 foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
   for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
     Subtree *child = &ts_subtree_children(*subtree)[i];
+    TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
+    if (child_diff_heap->preemptive_assignment != NULL) {
+      try_preemptive_assignment(registry, child, child_diff_heap);
+      continue;
+    }
     ts_subtree_registry_assign_share(registry, child);
     foreach_subtree_assign_share(child, registry);
   }
@@ -323,6 +328,11 @@ foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
 static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtree, SubtreeRegistry *registry) {
   for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
     Subtree *child = &ts_subtree_children(*subtree)[i];
+    TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
+    if (child_diff_heap->preemptive_assignment != NULL) {
+      try_preemptive_assignment(registry, child, child_diff_heap);
+      continue;
+    }
     ts_subtree_registry_assign_share_and_register_tree(registry, child);
     foreach_subtree_assign_share_and_register_tree(child, registry);
 
@@ -364,6 +374,8 @@ static inline void
 assign_tree(Subtree *this_subtree, Subtree *that_subtree, TSDiffHeap *this_diff_heap, TSDiffHeap *that_diff_heap) {
   this_diff_heap->assigned = that_subtree;
   that_diff_heap->assigned = this_subtree;
+  this_diff_heap->preemptive_assignment = NULL;
+  that_diff_heap->preemptive_assignment = NULL;
   this_diff_heap->share = NULL;
 }
 

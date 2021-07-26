@@ -214,9 +214,13 @@ ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool prefe
       res = NULL;
     }
   } else {
+    unsigned int av_tree_count = hashmap_num_entries(self->available_trees);
     HashmapResult iter_res = (HashmapResult) {.subtree=NULL};
     int iter_stat = hashmap_iterate(self->available_trees, iterator_first_element, &iter_res);
     res = iter_stat == 1 ? iter_res.subtree : NULL;
+    if (av_tree_count > 0) {
+      assert(res != NULL);
+    }
   }
   if (res == NULL) {
     return res;

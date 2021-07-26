@@ -197,15 +197,33 @@ assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { /
     foreach_tree_assign_share_and_register_tree(this_node, registry);
     return;
   }
+
+  SubtreeShare *this_share = NULL;
+  SubtreeShare *that_share = NULL;
+  if (this_diff_heap->preemptive_assignment != NULL && this_diff_heap->preemptive_assignment == that_diff_heap) {
+    // Both subtrees got the same share -> preemptive assignment
+    assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
+    return;
+  }
+  if (this_diff_heap->preemptive_assignment != NULL) {
+    try_preemptive_assignment(registry, this_subtree, this_diff_heap);
+  } else {
+    this_share = ts_subtree_registry_assign_share(registry, this_subtree);
+  }
+  if (that_diff_heap->preemptive_assignment != NULL) {
+    try_preemptive_assignment(registry, that_subtree, that_diff_heap);
+  } else {
+    that_share = ts_subtree_registry_assign_share(registry, that_subtree);
+  }
+
+
   // Assign shares or look into the IncrementalRegistry and search for an assignment if preemptive_assigned
-  SubtreeShare *this_share = ts_subtree_registry_assign_share(registry, this_subtree);
-  SubtreeShare *that_share = ts_subtree_registry_assign_share(registry, that_subtree);
-  if (this_share == that_share) {
+  if (this_share != NULL && this_share == that_share) {
     // Both subtrees got the same share -> preemptive assignment
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
   } else {
     // Subtrees got different shares
-    if (is_signature_equal(this_node, that_node)) { // check signature
+    if (this_share != NULL && that_share != NULL && is_signature_equal(this_node, that_node)) { // check signature
       // Signatures are equal -> recurse simultaneously
       uint32_t this_child_count = ts_real_node_child_count(this_node);
       ts_subtree_share_register_available_tree(this_share, this_subtree);
@@ -216,8 +234,8 @@ assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { /
       }
     } else {
       // Signatures are not equal -> recurse separately
-      foreach_tree_assign_share_and_register_tree(this_node, registry);
-      foreach_subtree_assign_share(that_subtree, registry);
+      if (this_share != NULL) { foreach_tree_assign_share_and_register_tree(this_node, registry); }
+      if (that_share != NULL) { foreach_subtree_assign_share(that_subtree, registry); }
     }
   }
 
@@ -354,6 +372,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   const Length other_position = other_diff_heap->position;
   bool size_change = !length_equal(old_size, new_size);
   bool padding_change = !length_equal(self_padding, other_padding);
+  bool subtree_has_changes = ts_subtree_has_changes(*self_subtree);
   if (is_literal) { // are those nodes literals
     // Perform update if the length or the content of the literal changed
     if (size_change || 0 != memcmp(((self_code) + self_position.bytes), ((other_code) + other_position.bytes),
@@ -384,7 +403,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     ts_edit_script_buffer_add(buffer, (SugaredEdit) {.edit_tag=UPDATE_PADDING, .update_padding=update_padding_data});
   }
   // update node in the original tree if needed
-  if (is_literal || size_change || padding_change || ts_subtree_has_changes(*self_subtree)) {
+  if (is_literal || size_change || padding_change || subtree_has_changes) {
     MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
     if (self_subtree->data.is_inline) {
       mut_subtree.data.padding_bytes = other_padding.bytes;
@@ -404,7 +423,8 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   self_diff_heap->position = other_position;
   self_diff_heap->padding = other_padding;
   self_diff_heap->size = new_size;
-  if (self_diff_heap->preemptive_assignment != NULL) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
+  if (self_diff_heap->preemptive_assignment !=
+      NULL) { //TODO: Verhaeltniss zum entfernen von Assignments während AssignShares
     reset_preassignment(self_diff_heap);
   }
   // increment the DiffHeap reference counter since this node is reused in the constructed tree
@@ -497,6 +517,12 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     this_diff_heap->share = NULL;
     other_diff_heap->assigned = NULL;
     other_diff_heap->share = NULL;
+    if (this_diff_heap->preemptive_assignment != NULL) {
+      reset_preassignment(this_diff_heap);
+    }
+    if (other_diff_heap->preemptive_assignment != NULL) {
+      reset_preassignment(other_diff_heap);
+    }
     // create new parent node
     MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &subtree_array,
                                                   ts_subtree_production_id(*other_subtree), self.tree->language);
@@ -899,8 +925,16 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     printf("[%p] Share not reset\n", d1->id);
     error = true;
   }
-  if (d1->share != NULL) {
+  if (d2->share != NULL) {
     printf("[%p] Share not reset\n", d2->id);
+    error = true;
+  }
+  /*if (d1->preemptive_assignment != NULL) {
+    printf("[%p] Preemptive Assignment not reset\n", d1->id);
+    error = true;
+  }*/
+  if (d2->preemptive_assignment != NULL) {
+    printf("[%p] Preemptive Assignment not reset\n", d2->id);
     error = true;
   }
   for (uint32_t i = 0; i < ts_real_node_child_count(n1); i++) {
