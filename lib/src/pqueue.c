@@ -47,7 +47,7 @@ void priority_queue_destroy(PriorityQueue *queue) {
 void priority_queue_insert(PriorityQueue *queue, Subtree *node) {
   if (queue->used == queue->size) {
     queue->size *= 2;
-    queue->queue = ts_realloc(queue->queue, queue->size * sizeof(Subtree *));
+    queue->queue = ts_realloc(queue->queue, (queue->size + 1) * sizeof(Subtree *));
   }
   queue->used++;
   queue->queue[queue->used] = node;
