@@ -220,7 +220,8 @@ ts_diff_heap_hash_init(SHA256_Context *structural_context, SHA256_Context *liter
     fprintf(stderr, "SHA_digest library failure at initialize\n");
     return;
   }
-  const TSSymbol symbol = ts_node_symbol(*node);
+  const Subtree *sub = (Subtree *) node->id;
+  const TSSymbol symbol = ts_subtree_symbol(*sub);
   // Hash node type in structural hash
   if (sha256_add_bytes(structural_context, &symbol, sizeof(symbol)) != SHA_DIGEST_OK) {
     fprintf(stderr, "SHA_digest library failure at add_bytes of tag\n");

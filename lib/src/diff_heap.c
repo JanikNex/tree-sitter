@@ -140,8 +140,10 @@ void ts_diff_heap_delete(const TSTree *tree) {
 static bool is_signature_equal(TSNode this_node, TSNode that_node) {
   uint32_t this_child_count = ts_real_node_child_count(this_node);
   uint32_t that_child_count = ts_real_node_child_count(that_node);
+  Subtree *this_subtree = (Subtree *) this_node.id;
+  Subtree *that_subtree = (Subtree *) that_node.id;
   // Check node type
-  if (ts_node_symbol(this_node) != ts_node_symbol(that_node)) return false;
+  if (ts_subtree_symbol(*this_subtree) != ts_subtree_symbol(*that_subtree)) return false;
   // Check number of children
   if (this_child_count != that_child_count) return false;
   // Check whether children are equally unnamed or appended to the same field
@@ -501,7 +503,8 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
       TSNode this_kid = ts_real_node_child(self, i);
       TSNode that_kid = ts_real_node_child(other, i);
       // compute editscript and constructed subtree of this child
-      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id, ts_node_symbol(self), i,
+      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id,
+                                                ts_subtree_symbol(*self_subtree), i,
                                                 buffer, subtree_pool, self_code, other_code, literal_map);
       array_push(&subtree_array, kid_subtree);
     }
@@ -524,7 +527,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
       reset_preassignment(other_diff_heap);
     }
     // create new parent node
-    MutableSubtree mut_node = ts_subtree_new_node(ts_node_symbol(other), &subtree_array,
+    MutableSubtree mut_node = ts_subtree_new_node(ts_subtree_symbol(*other_subtree), &subtree_array,
                                                   ts_subtree_production_id(*other_subtree), self.tree->language);
     ts_subtree_assign_node_diff_heap(&mut_node, this_diff_heap); // assign DiffHeap to the new parent node
     Subtree new_node = ts_subtree_from_mut(mut_node);
@@ -550,7 +553,7 @@ static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
     // create basic unload
     Unload unload_data = {
       .id=this_diff_heap->id,
-      .tag=ts_node_symbol(self)
+      .tag=ts_subtree_symbol(*self_subtree)
     };
     ChildPrototypeArray child_prototypes = array_new(); // create array to hold the ids of all children
     for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
@@ -607,13 +610,13 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
   memcpy(new_node_diff_heap->literal_hash, other_diff_heap->literal_hash, SHA256_HASH_SIZE);
   Load load_data = {
     .id=new_id,
-    .tag=ts_node_symbol(other),
+    .tag=ts_subtree_symbol(*other_subtree),
   };
-  if (ts_real_node_child_count(other) > 0) { // test for children to decide if it's a node or a leaf
+  if (ts_subtree_child_count(*other_subtree) > 0) { // test for children to decide if it's a node or a leaf
     // -> Node
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
-    for (uint32_t i = 0; i < ts_real_node_child_count(other); i++) { // load children
+    for (uint32_t i = 0; i < ts_subtree_child_count(*other_subtree); i++) { // load children
       TSNode other_kid = ts_real_node_child(other, i);
       Subtree kid_subtree = load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree,
                                             subtree_pool);
@@ -627,7 +630,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
       Subtree err_node = ts_subtree_new_error_node(&kids, ts_subtree_extra(*other_subtree), self_tree->language);
       mut_node = ts_subtree_to_mut_unsafe(err_node);
     } else {
-      mut_node = ts_subtree_new_node(ts_node_symbol(other), &kids,
+      mut_node = ts_subtree_new_node(ts_subtree_symbol(*other_subtree), &kids,
                                      ts_subtree_production_id(*other_subtree), self_tree->language);
     }
     ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap); // assign DiffHeap to the new node
@@ -858,7 +861,7 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
   const Subtree *s1 = (Subtree *) n1.id;
   const Subtree *s2 = (Subtree *) n2.id;
   bool error = false;
-  if (ts_real_node_child_count(n1) != ts_real_node_child_count(n2)) {
+  if (ts_subtree_child_count(*s1) != ts_subtree_child_count(*s2)) {
     printf("[%p | %p] Real node child count mismatch\n", d1->id, d2->id);
     error = true;
   }
@@ -882,7 +885,8 @@ bool ts_reconstruction_test(const TSNode n1, const TSNode n2) {
     error = true;
   }
   if (ts_subtree_production_id(*s1) != ts_subtree_production_id(*s2)) {
-    printf("[%p | %p] SubtreeProductionID mismatch\n", d1->id, d2->id);
+    printf("[%p | %p] SubtreeProductionID mismatch %d != %d\n", d1->id, d2->id, ts_subtree_production_id(*s1),
+           ts_subtree_production_id(*s2));
     error = true;
   }
   if (!length_equal(d1->position, d2->position)) {
