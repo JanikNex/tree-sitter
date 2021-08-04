@@ -305,7 +305,7 @@ MutableSubtree ts_subtree_make_mut(SubtreePool *pool, Subtree self) {
 MutableSubtree ts_subtree_deepcopy(Subtree self) {
   MutableSubtree mut_copy;
   if (self.data.is_inline){
-    mut_copy =  ts_subtree_to_mut_unsafe(self);
+    mut_copy = ts_subtree_to_mut_unsafe(self);
   }else {
     mut_copy = ts_subtree_clone(self);
   }
@@ -315,6 +315,8 @@ MutableSubtree ts_subtree_deepcopy(Subtree self) {
     assert(self_diff_heap != NULL);
     TSDiffHeap *shadowed_diff_heap = ts_diff_heap_reuse(self_diff_heap);
     ts_subtree_assign_node_diff_heap(&mut_copy, shadowed_diff_heap);
+  }else{
+    ts_subtree_assign_node_diff_heap(&mut_copy, NULL);
   }
   // Copy child subtrees recursively
   for (uint32_t i = 0; i < ts_subtree_child_count(self); i++) {

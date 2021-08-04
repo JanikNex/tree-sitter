@@ -179,7 +179,8 @@ static bool stack__subtree_is_equivalent(Subtree left, Subtree right) {
        ts_subtree_size(left).bytes == ts_subtree_size(right).bytes &&
        ts_subtree_child_count(left) == ts_subtree_child_count(right) &&
        ts_subtree_extra(left) == ts_subtree_extra(right) &&
-       ts_subtree_external_scanner_state_eq(left, right))));
+       ts_subtree_external_scanner_state_eq(left, right) &&
+        ts_subtree_node_diff_heap(left) == ts_subtree_node_diff_heap(right))));
 }
 
 static void stack_node_add_link(StackNode *self, StackLink link, SubtreePool *subtree_pool) {
