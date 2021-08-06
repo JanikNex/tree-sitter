@@ -972,6 +972,8 @@ bool ts_diff_tree_cursor_goto_first_child(TSTreeCursor *);
 
 bool ts_reconstruction_test(TSNode, TSNode);
 
+bool ts_incremental_parse_test(TSNode, TSNode);
+
 #ifdef __cplusplus
 }
 #endif
