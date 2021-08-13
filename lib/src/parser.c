@@ -786,10 +786,11 @@ static bool ts_parser__select_children(
  * decrements the reference counter of the root, since we are not reusing the original node.
  * @param root Original subtree root
  * @param extra Calculated extra value from the parser
+ * @param safe_reuse Can this subtree be reused without a chance of getting discarded in another version
  * @return Copy of the passed root
  */
-static Subtree ts_parser__diffable_subtree_reuse(Subtree root, bool extra) {
-  MutableSubtree deep_copy_root = ts_subtree_deepcopy(root);
+static Subtree ts_parser__diffable_subtree_reuse(Subtree root, bool extra, bool safe_reuse) {
+  MutableSubtree deep_copy_root = ts_subtree_deepcopy(root, safe_reuse);
   if (extra != ts_subtree_extra(root)) {
     ts_subtree_set_extra(&deep_copy_root);
   }
@@ -797,7 +798,9 @@ static Subtree ts_parser__diffable_subtree_reuse(Subtree root, bool extra) {
     atomic_dec((volatile uint32_t *)&root.ptr->ref_count);
   }
   Subtree copied_root = ts_subtree_from_mut(deep_copy_root);
-  ts_subtree_preemptive_assign(root, copied_root);
+  if (safe_reuse){
+    ts_subtree_preemptive_assign(root, copied_root);
+  }
   return copied_root;
 }
 
@@ -810,7 +813,8 @@ static void ts_parser__shift(
 ) {
   Subtree subtree_to_push;
   if (ts_subtree_node_diff_heap(lookahead) != NULL){
-    subtree_to_push = ts_parser__diffable_subtree_reuse(lookahead, extra);
+    assert(version == 0);
+    subtree_to_push = ts_parser__diffable_subtree_reuse(lookahead, extra, ts_stack_version_count(self->stack) == 1);
   }else {
     if (extra != ts_subtree_extra(lookahead)) {
       MutableSubtree result = ts_subtree_make_mut(&self->tree_pool, lookahead);
@@ -952,7 +956,7 @@ static void ts_parser__accept(
 ) {
   assert(ts_subtree_is_eof(lookahead));
   if (ts_subtree_node_diff_heap(lookahead) != NULL){
-    lookahead = ts_parser__diffable_subtree_reuse(lookahead, ts_subtree_extra(lookahead));
+    lookahead = ts_parser__diffable_subtree_reuse(lookahead, ts_subtree_extra(lookahead), ts_stack_version_count(self->stack) == 1);
   }
   ts_stack_push(self->stack, version, lookahead, false, 1);
 

@@ -300,9 +300,10 @@ MutableSubtree ts_subtree_make_mut(SubtreePool *pool, Subtree self) {
  * After a child subtree (not inline) has been processed, the reference counter is decremented
  * because it was increased during cloning.
  * @param self Root of the subtree to be copied.
+ * @param safe_reuse Can this subtree be reused without a chance of getting discarded in another version
  * @return MutableSubtree of the copied subtree.
  */
-MutableSubtree ts_subtree_deepcopy(Subtree self) {
+MutableSubtree ts_subtree_deepcopy(Subtree self, bool safe_reuse) {
   MutableSubtree mut_copy;
   if (self.data.is_inline){
     mut_copy = ts_subtree_to_mut_unsafe(self);
@@ -310,7 +311,7 @@ MutableSubtree ts_subtree_deepcopy(Subtree self) {
     mut_copy = ts_subtree_clone(self);
   }
   // Copy TSDiffHeap if not changes were applied.
-  if (!ts_subtree_has_changes(self)) {
+  if (!ts_subtree_has_changes(self) && safe_reuse) {
     TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(self);
     assert(self_diff_heap != NULL);
     TSDiffHeap *shadowed_diff_heap = ts_diff_heap_reuse(self_diff_heap);
@@ -321,7 +322,7 @@ MutableSubtree ts_subtree_deepcopy(Subtree self) {
   // Copy child subtrees recursively
   for (uint32_t i = 0; i < ts_subtree_child_count(self); i++) {
     Subtree child = ts_subtree_children(self)[i];
-    MutableSubtree child_copy = ts_subtree_deepcopy(child);
+    MutableSubtree child_copy = ts_subtree_deepcopy(child, safe_reuse);
     ts_subtree_children(mut_copy)[i] = ts_subtree_from_mut(child_copy);
     if (!child.data.is_inline) {
       atomic_dec((volatile uint32_t *) &child.ptr->ref_count);

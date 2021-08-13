@@ -1019,6 +1019,9 @@ bool ts_incremental_parse_test(const TSNode n1, const TSNode n2) {
     printf("[%p | %p] Literal hash mismatch\n", d1->id, d2->id);
     error = true;
   }
+  if (error) {
+    printf("Subtree %p has error with DiffHeap %p | %p\n", s2, d2->id, d2);
+  }
   for (uint32_t i = 0; i < ts_real_node_child_count(n1); i++) {
     TSNode kid1 = ts_real_node_child(n1, i);
     TSNode kid2 = ts_real_node_child(n2, i);

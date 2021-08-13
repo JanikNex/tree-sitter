@@ -23,7 +23,6 @@ typedef struct {
   StackNode *node;
   Subtree subtree;
   bool is_pending;
-  bool is_multi_version;
 } StackLink;
 
 struct StackNode {
@@ -92,16 +91,6 @@ static void stack_node_retain(StackNode *self) {
   assert(self->ref_count != 0);
 }
 
-static void stack_node_release_diff_heap(StackLink link){
-  if (link.subtree.data.is_inline){
-    if (ts_subtree_node_diff_heap(link.subtree) != NULL){
-      if (link.is_multi_version){
-        link.subtree = ts_subtree_remove_diff_heap(link.subtree);
-      }
-    }
-  }
-}
-
 static void stack_node_release(StackNode *self, StackNodeArray *pool, SubtreePool *subtree_pool) {
 recur:
   assert(self->ref_count != 0);
@@ -112,12 +101,10 @@ recur:
   if (self->link_count > 0) {
     for (unsigned i = self->link_count - 1; i > 0; i--) {
       StackLink link = self->links[i];
-      stack_node_release_diff_heap(link);
       if (link.subtree.ptr) ts_subtree_release(subtree_pool, link.subtree);
       stack_node_release(link.node, pool, subtree_pool);
     }
     StackLink link = self->links[0];
-    stack_node_release_diff_heap(link);
     if (link.subtree.ptr) ts_subtree_release(subtree_pool, link.subtree);
     first_predecessor = self->links[0].node;
   }
@@ -134,8 +121,8 @@ recur:
   }
 }
 
-static StackNode *stack_node_new(StackNode *previous_node, Subtree subtree,
-                                 bool is_pending, bool is_multi_version, TSStateId state, StackNodeArray *pool) {
+static StackNode *
+stack_node_new(StackNode *previous_node, Subtree subtree, bool is_pending, TSStateId state, StackNodeArray *pool) {
   StackNode *node = pool->size > 0 ?
     array_pop(pool) :
     ts_malloc(sizeof(StackNode));
@@ -146,8 +133,7 @@ static StackNode *stack_node_new(StackNode *previous_node, Subtree subtree,
     node->links[0] = (StackLink){
       .node = previous_node,
       .subtree = subtree,
-      .is_pending = is_pending,
-      .is_multi_version = is_multi_version
+      .is_pending = is_pending
     };
 
     node->position = previous_node->position;
@@ -391,7 +377,7 @@ Stack *ts_stack_new(SubtreePool *subtree_pool) {
   array_reserve(&self->node_pool, MAX_NODE_POOL_SIZE);
 
   self->subtree_pool = subtree_pool;
-  self->base_node = stack_node_new(NULL, NULL_SUBTREE, false, false,1, &self->node_pool);
+  self->base_node = stack_node_new(NULL, NULL_SUBTREE, false, 1, &self->node_pool);
   ts_stack_clear(self);
 
   return self;
@@ -461,7 +447,7 @@ unsigned ts_stack_node_count_since_error(const Stack *self, StackVersion version
 void ts_stack_push(Stack *self, StackVersion version, Subtree subtree,
                    bool pending, TSStateId state) {
   StackHead *head = array_get(&self->heads, version);
-  StackNode *new_node = stack_node_new(head->node, subtree, pending, ts_stack_version_count(self) != 1,state, &self->node_pool);
+  StackNode *new_node = stack_node_new(head->node, subtree, pending, state, &self->node_pool);
   if (!subtree.ptr) head->node_count_at_last_error = new_node->node_count;
   head->node = new_node;
 }
