@@ -170,11 +170,12 @@ static inline Subtree ts_diff_heap_del(Subtree subtree) {
     // Subtree has DiffHeap and was the last reference
     ts_free(diff_heap->id); // free id
     ts_free(diff_heap); // free DiffHeap
+    // Remove reference from subtree
+    MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(subtree);
+    ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
+    return ts_subtree_from_mut(mut_subtree);
   }
-  // Remove reference from subtree
-  MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(subtree);
-  ts_subtree_assign_node_diff_heap(&mut_subtree, NULL);
-  return ts_subtree_from_mut(mut_subtree);
+  return subtree;
 }
 
 /**
