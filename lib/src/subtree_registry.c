@@ -39,6 +39,7 @@ void ts_subtree_registry_clean_delete(SubtreeRegistry *self) {
   }
   raxStop(&iter);
   raxFree(self->subtrees);
+  hashmap_destroy(&self->inc_registry);
   ts_free(self);
 }
 
