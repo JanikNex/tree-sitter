@@ -3,6 +3,7 @@
 #include "tree.h"
 #include "subtree_share.h"
 #include "pqueue.h"
+#include "language.h"
 
 
 /**
@@ -133,40 +134,19 @@ void ts_diff_heap_delete(const TSTree *tree) {
  * 2. Same number of children
  * 3. Every pair of kids is either unnamed or appended to the same field
  *
- * @param this_node Node
- * @param that_node Node
+ * @param this_subtree Pointer to a subtree
+ * @param that_subtree Pointer to a subtree
  * @return bool
  */
-static bool is_signature_equal(TSNode this_node, TSNode that_node) {
-  uint32_t this_child_count = ts_real_node_child_count(this_node);
-  uint32_t that_child_count = ts_real_node_child_count(that_node);
-  Subtree *this_subtree = (Subtree *) this_node.id;
-  Subtree *that_subtree = (Subtree *) that_node.id;
+static bool is_signature_equal(Subtree *this_subtree, Subtree *that_subtree) {
+  uint32_t this_child_count = ts_subtree_child_count(*this_subtree);
+  uint32_t that_child_count = ts_subtree_child_count(*that_subtree);
   // Check node type
   if (ts_subtree_symbol(*this_subtree) != ts_subtree_symbol(*that_subtree)) return false;
   // Check number of children
   if (this_child_count != that_child_count) return false;
-  // Check whether children are equally unnamed or appended to the same field
-  if (this_child_count > 0) {
-    bool field_eq = true;
-    TSTreeCursor this_cursor = ts_tree_cursor_new(this_node);
-    ts_diff_tree_cursor_goto_first_child(&this_cursor);
-    TSTreeCursor that_cursor = ts_tree_cursor_new(that_node);
-    ts_diff_tree_cursor_goto_first_child(&that_cursor);
-    do {
-      TSNode this_kid = ts_tree_cursor_current_node(&this_cursor);
-      TSNode that_kid = ts_tree_cursor_current_node(&that_cursor);
-      if (ts_node_is_named(this_kid) != ts_node_is_named(that_kid) || ts_tree_cursor_current_field_id(&this_cursor) !=
-                                                                      ts_tree_cursor_current_field_id(&that_cursor)) {
-        field_eq = false;
-        break;
-      }
-    } while (ts_diff_tree_cursor_goto_next_sibling(&this_cursor) &&
-             ts_diff_tree_cursor_goto_next_sibling(&that_cursor));
-    ts_tree_cursor_delete(&this_cursor);
-    ts_tree_cursor_delete(&that_cursor);
-    return field_eq;
-  }
+  // Check whether subtrees were created by the same production id -> same fields
+  if (ts_subtree_production_id(*this_subtree) != ts_subtree_production_id(*that_subtree)) return false;
   return true;
 }
 
@@ -181,22 +161,21 @@ static bool is_signature_equal(TSNode this_node, TSNode that_node) {
  * 2. Both subtrees are assigned different shares but they have the same type -> recurse simultaneously
  * 3. Both subtrees are assigned different shares and have different types -> recurse separately
  *
- * @param this_node Node in the original tree
- * @param that_node Node in the changed tree
+ * @param this_subtree Pointer to a subtree in the original tree
+ * @param that_subtree Pointer to a subtree in the changed tree
  * @param registry SubtreeRegistry to keep track of all shares
  */
 static void
-assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { // TODO: Possible without recursion?
-  Subtree *this_subtree = (Subtree *) this_node.id;
-  Subtree *that_subtree = (Subtree *) that_node.id;
+assign_shares(Subtree *this_subtree, Subtree *that_subtree,
+              SubtreeRegistry *registry) { // TODO: Possible without recursion?
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
   TSDiffHeap *that_diff_heap = ts_subtree_node_diff_heap(*that_subtree);
   if (this_diff_heap->skip_node) {
-    foreach_tree_assign_share(that_node, registry);
+    foreach_tree_assign_share(that_subtree, registry);
     return;
   }
   if (that_diff_heap->skip_node) {
-    foreach_tree_assign_share_and_register_tree(this_node, registry);
+    foreach_tree_assign_share_and_register_tree(this_subtree, registry);
     return;
   }
 
@@ -225,55 +204,33 @@ assign_shares(TSNode this_node, TSNode that_node, SubtreeRegistry *registry) { /
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
   } else {
     // Subtrees got different shares
-    if (this_share != NULL && that_share != NULL && is_signature_equal(this_node, that_node)) { // check signature
+    if (this_share != NULL && that_share != NULL && is_signature_equal(this_subtree, that_subtree)) { // check signature
       // Signatures are equal -> recurse simultaneously
-      uint32_t this_child_count = ts_real_node_child_count(this_node);
       ts_subtree_share_register_available_tree(this_share, this_subtree);
-      for (uint32_t i = 0; i < this_child_count; i++) {
-        TSNode this_child = ts_real_node_child(this_node, i);
-        TSNode that_child = ts_real_node_child(that_node, i);
-        assign_shares(this_child, that_child, registry);
+      for (uint32_t i = 0; i < ts_subtree_child_count(*this_subtree); i++) {
+        Subtree *this_kid = &ts_subtree_children(*this_subtree)[i];
+        Subtree *that_kid = &ts_subtree_children(*that_subtree)[i];
+        assign_shares(this_kid, that_kid, registry);
       }
     } else {
       // Signatures are not equal -> recurse separately
-      if (this_share != NULL) { foreach_tree_assign_share_and_register_tree(this_node, registry); }
+      if (this_share != NULL) { foreach_tree_assign_share_and_register_tree(this_subtree, registry); }
       if (that_share != NULL) { foreach_subtree_assign_share(that_subtree, registry); }
     }
   }
 
 }
 
-/**
- * Constructs a TSNode with the information of the subtree and the DiffHeap
- * @param subtree Subtree whose node is required
- * @param tree The tree of the subtree
- * @return TSNode of the subtree
- */
-TSNode ts_diff_heap_node(const Subtree *subtree, const TSTree *tree) {
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  return (TSNode) {
-    {
-      diff_heap->position.bytes,
-      diff_heap->position.extent.row,
-      diff_heap->position.extent.column,
-      ts_subtree_symbol(*subtree)
-    },
-    subtree,
-    tree,
-    diff_heap
-  };
-}
 
 /**
  * Iterates a list of subtrees look for an assignable subtree in the registry for every subtree that is
  * still unassigned. The preferred parameter indicated whether the literal or the structural hash should be used.
  * @param nodes NodeEntryArray of subtrees
- * @param tree TSTree of the changed tree
  * @param preferred bool that indicated whether to use the structural or literal hash
  * @param registry SubtreeRegistry
  */
 static inline void
-select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool preferred, SubtreeRegistry *registry) {
+select_available_tree(NodeEntryArray *nodes, const bool preferred, SubtreeRegistry *registry) {
   for (uint32_t i = 0; i < nodes->size; i++) { // iterate all array elements
     NodeEntry *entry = array_get(nodes, i);
     if (!entry->valid) { // TODO: sort by validity to speed up iterations
@@ -288,9 +245,8 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
     } else {
       SubtreeShare *node_share = diff_heap->share;
       assert(node_share != NULL);
-      TSNode subtree_node = ts_diff_heap_node(subtree, tree);
       // Search for possible assignable subtree
-      Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree_node, preferred, registry);
+      Subtree *available_tree = ts_subtree_share_take_available_tree(node_share, subtree, preferred, registry);
       if (available_tree != NULL) {
         // assign tree, if an assignable subtree was found
         TSDiffHeap *available_diff_heap = ts_subtree_node_diff_heap(*available_tree);
@@ -309,12 +265,12 @@ select_available_tree(NodeEntryArray *nodes, const TSTree *tree, const bool pref
  * a corresponding subtree from the registry.
  * The children of nodes that cannot be assigned are added to the queue.
  *
- * @param that_node Root-Node of the changed tree
- * @param registry SubtreeRegistry
+ * @param that_subtree Pointer to a subtree in the changed tree
+ * @param registry Pointer to the SubtreeRegistry
  */
-static void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
+static void assign_subtrees(Subtree *that_subtree, SubtreeRegistry *registry) {
   PriorityQueue *queue = priority_queue_create(); // create queue
-  priority_queue_insert(queue, (Subtree *) that_node.id); // insert the subtree of the node
+  priority_queue_insert(queue, that_subtree); // insert the subtree of the node
   NodeEntryArray next_nodes = array_new(); // create array as working list
   while (!priority_queue_is_empty(queue)) {
     unsigned int lvl = priority_queue_head_value(queue); // store tree height of first element
@@ -328,16 +284,15 @@ static void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
         array_push(&next_nodes, ((NodeEntry) {.subtree=next, .valid=true})); // add not to working list
       }
     }
-    select_available_tree(&next_nodes, that_node.tree, true, registry); // try to assign using literal hash
-    select_available_tree(&next_nodes, that_node.tree, false, registry); // try to assign using structural hash
+    select_available_tree(&next_nodes, true, registry); // try to assign using literal hash
+    select_available_tree(&next_nodes, false, registry); // try to assign using structural hash
     while (next_nodes.size) {
       NodeEntry entry = array_pop(&next_nodes);
       if (entry.valid) { // Test if subtree got assigned
         // Add children of unassigned subtree to queue
-        TSNode next_node = ts_diff_heap_node(entry.subtree, that_node.tree);
-        for (uint32_t i = 0; i < ts_real_node_child_count(next_node); i++) {
-          TSNode child_node = ts_real_node_child(next_node, i);
-          Subtree *child_subtree = (Subtree *) child_node.id;
+        Subtree *next_node = entry.subtree;
+        for (uint32_t i = 0; i < ts_subtree_child_count(*next_node); i++) {
+          Subtree *child_subtree = &ts_subtree_children(*next_node)[i];
           priority_queue_insert(queue, child_subtree);
         }
       }
@@ -350,20 +305,22 @@ static void assign_subtrees(TSNode that_node, SubtreeRegistry *registry) {
 
 /**
  * Compares two nodes and performs an update of the original node if needed
- * @param self TSNode in the original tree
- * @param other TSNode in the changed tree
+ * @param self_subtree Pointer to a subtree in the original tree
+ * @param other_subtree Pointer to a subtree in the changed tree
  * @param buffer Pointer to the EditScriptBuffer
+ * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
  * @param literal_map Pointer to the literalmap
  */
 static inline void
-update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
+update_literals(Subtree *self_subtree, Subtree *other_subtree, EditScriptBuffer *buffer, const TSLanguage *lang,
+                const char *self_code, const char *other_code,
                 const TSLiteralMap *literal_map) {
-  bool is_literal = ts_literal_map_is_literal(literal_map, ts_node_symbol(self)) &&
-                    ts_literal_map_is_literal(literal_map, ts_node_symbol(other));
-  Subtree *self_subtree = (Subtree *) self.id;
-  Subtree *other_subtree = (Subtree *) other.id;
+  TSSymbol self_psymbol = ts_language_public_symbol(lang, ts_subtree_symbol(*self_subtree));
+  TSSymbol other_psymbol = ts_language_public_symbol(lang, ts_subtree_symbol(*other_subtree));
+  assert(self_psymbol == other_psymbol);
+  bool is_literal = ts_literal_map_is_literal(literal_map, self_psymbol);
   TSDiffHeap *self_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   const Length old_size = self_diff_heap->size;
@@ -380,7 +337,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     if (size_change || 0 != memcmp(((self_code) + self_position.bytes), ((other_code) + other_position.bytes),
                                    old_size.bytes)) {
       Update update_data = { // create update
-        .id=self.diff_heap->id,
+        .id=self_diff_heap->id,
         .tag=ts_subtree_symbol(*self_subtree),
         .old_start=self_position,
         .old_size=old_size,
@@ -397,7 +354,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
   }
   if (padding_change) { // Create UpdatePaddingEdit if the padding has been changed
     UpdatePadding update_padding_data = {
-      .id=self.diff_heap->id,
+      .id=self_diff_heap->id,
       .tag=ts_subtree_symbol(*self_subtree),
       .old_padding=self_padding,
       .new_padding=other_padding
@@ -420,7 +377,7 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
     }
     *self_subtree = ts_subtree_from_mut(mut_subtree);
   }
-  // copy literal hash from the changed to to reflect possible literal changes
+  // copy literal hash from the changed to reflect possible literal changes
   memcpy(self_diff_heap->literal_hash, other_diff_heap->literal_hash, SHA256_HASH_SIZE);
   self_diff_heap->position = other_position;
   self_diff_heap->padding = other_padding;
@@ -437,75 +394,58 @@ update_literals(TSNode self, TSNode other, EditScriptBuffer *buffer, const char 
 
 /**
  * Update literals for every node in the subtree
- * @param self TSNode in the original tree
- * @param other TSNode in the changed tree
+ * @param self Pointer to a subtree in the original tree
+ * @param other Pointer to a subtree in the changed tree
  * @param buffer Pointer to the EditScriptBuffer
+ * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
  * @param literal_map Pointer to the literalmap
  */
-static void
-update_literals_iter(TSNode self, TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
-                     const TSLiteralMap *literal_map) {
-  TSTreeCursor self_cursor = ts_tree_cursor_new(self);
-  TSTreeCursor other_cursor = ts_tree_cursor_new(other);
-  int lvl = 0;
-  TSNode self_child;
-  TSNode other_child;
-  do {
-    self_child = ts_tree_cursor_current_node(&self_cursor);
-    other_child = ts_tree_cursor_current_node(&other_cursor);
-    update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
-    while (ts_diff_tree_cursor_goto_first_child(&self_cursor) && ts_diff_tree_cursor_goto_first_child(&other_cursor)) {
-      lvl++;
-      self_child = ts_tree_cursor_current_node(&self_cursor);
-      other_child = ts_tree_cursor_current_node(&other_cursor);
-      update_literals(self_child, other_child, buffer, self_code, other_code, literal_map);
-    }
-    while (
-      !(ts_diff_tree_cursor_goto_next_sibling(&self_cursor) &&
-        ts_diff_tree_cursor_goto_next_sibling(&other_cursor)) &&
-      lvl > 0) {
-      lvl--;
-      ts_diff_tree_cursor_goto_parent(&self_cursor);
-      ts_diff_tree_cursor_goto_parent(&other_cursor);
-    }
-  } while (lvl > 0);
-  ts_tree_cursor_delete(&self_cursor);
-  ts_tree_cursor_delete(&other_cursor);
-
+static void update_literals_rec(Subtree *self, Subtree *other, EditScriptBuffer *buffer, const TSLanguage *lang,
+                                const char *self_code, const char *other_code,
+                                const TSLiteralMap *literal_map) {
+  assert(ts_subtree_child_count(*self) == ts_subtree_child_count(*other));
+  update_literals(self, other, buffer, lang, self_code, other_code, literal_map);
+  for (uint32_t i = 0; i < ts_subtree_child_count(*self); i++) {
+    Subtree *self_child = &ts_subtree_children(*self)[i];
+    Subtree *other_child = &ts_subtree_children(*other)[i];
+    update_literals_rec(self_child, other_child, buffer, lang, self_code, other_code, literal_map);
+  }
 }
+
 
 /**
  * Check signature and compute the editscript for every child of the given TSNode
  * Creates a new node and assigns the constructed childnodes.
- * @param self TSNode in the original tree
- * @param other TSNode in the changed tree
+ * @param this_subtree Pointer to a subtree in the original tree
+ * @param other_subtree Pointer to a subtree in the changed tree
  * @param buffer Pointer to the EditScriptBuffer
  * @param subtree_pool Pointer to the SubtreePool
+ * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
  * @param literal_map Pointer to the literalmap
  * @return Constructed subtree or NULL_SUBTREE if signature does not match
  */
-Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer *buffer, SubtreePool *subtree_pool,
+Subtree compute_edit_script_recurse(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuffer *buffer,
+                                    SubtreePool *subtree_pool,
+                                    const TSLanguage *lang,
                                     const char *self_code,
                                     const char *other_code,
                                     const TSLiteralMap *literal_map) {
-  if (is_signature_equal(self, other)) { // check signature
-    Subtree *self_subtree = (Subtree *) self.id;
-    Subtree *other_subtree = (Subtree *) other.id;
-    TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
+  if (is_signature_equal(this_subtree, other_subtree)) { // check signature
+    TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
     TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
     diff_heap_inc(this_diff_heap); // increment reference counter since we reuse a DiffHeap from the original tree
     SubtreeArray subtree_array = array_new();
-    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
-      TSNode this_kid = ts_real_node_child(self, i);
-      TSNode that_kid = ts_real_node_child(other, i);
+    for (uint32_t i = 0; i < ts_subtree_child_count(*this_subtree); i++) {
+      Subtree *this_kid = &ts_subtree_children(*this_subtree)[i];
+      Subtree *other_kid = &ts_subtree_children(*other_subtree)[i];
       // compute editscript and constructed subtree of this child
-      Subtree kid_subtree = compute_edit_script(this_kid, that_kid, this_diff_heap->id,
-                                                ts_subtree_symbol(*self_subtree), i,
-                                                buffer, subtree_pool, self_code, other_code, literal_map);
+      Subtree kid_subtree = compute_edit_script(this_kid, other_kid, this_diff_heap->id,
+                                                ts_subtree_symbol(*this_subtree), i,
+                                                buffer, subtree_pool, lang, self_code, other_code, literal_map);
       array_push(&subtree_array, kid_subtree);
     }
     // Update DiffHeaps
@@ -528,7 +468,7 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
     }
     // create new parent node
     MutableSubtree mut_node = ts_subtree_new_node(ts_subtree_symbol(*other_subtree), &subtree_array,
-                                                  ts_subtree_production_id(*other_subtree), self.tree->language);
+                                                  ts_subtree_production_id(*other_subtree), lang);
     ts_subtree_assign_node_diff_heap(&mut_node, this_diff_heap); // assign DiffHeap to the new parent node
     Subtree new_node = ts_subtree_from_mut(mut_node);
     return new_node;
@@ -540,11 +480,10 @@ Subtree compute_edit_script_recurse(TSNode self, TSNode other, EditScriptBuffer 
 /**
  * Traverses all subtrees of the given node of the original tree recursively and creates UnloadEdits
  * for all unassigned nodes.
- * @param self TSNode in the original tree
+ * @param self_subtree Pointer to a subtree in the original tree
  * @param buffer Pointer to the EditScriptBuffer
  */
-static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
-  Subtree *self_subtree = (Subtree *) self.id;
+static void unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer) {
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   this_diff_heap->share = NULL; // reset share
   if (this_diff_heap->assigned != NULL) { // check if assigned
@@ -556,9 +495,9 @@ static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
       .tag=ts_subtree_symbol(*self_subtree)
     };
     ChildPrototypeArray child_prototypes = array_new(); // create array to hold the ids of all children
-    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) {
-      TSNode child = ts_real_node_child(self, i);
-      const TSDiffHeap *child_diff_heap = child.diff_heap;
+    for (uint32_t i = 0; i < ts_subtree_child_count(*self_subtree); i++) {
+      Subtree *child = &ts_subtree_children(*self_subtree)[i];
+      const TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
       array_push(&child_prototypes, (ChildPrototype) {.child_id=child_diff_heap->id});
     }
     unload_data.kids = child_prototypes; // add the ChildPrototypeArray to the unload
@@ -567,8 +506,8 @@ static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
                                 .edit_tag=UNLOAD,
                                 .unload=unload_data
                               }); // create unload
-    for (uint32_t i = 0; i < ts_real_node_child_count(self); i++) { // recursive call
-      TSNode child = ts_real_node_child(self, i);
+    for (uint32_t i = 0; i < ts_subtree_child_count(*self_subtree); i++) { // recursive call
+      Subtree *child = &ts_subtree_children(*self_subtree)[i];
       unload_unassigned(child, buffer);
     }
   }
@@ -576,7 +515,7 @@ static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
 
 /**
  * Load all nodes that are part of the changed tree but do not exist in the original tree, recursively
- * @param other TSNode in the changed tree
+ * @param other_subtree Pointer to a subtree in the changed tree
  * @param buffer Pointer to the EditScriptBuffer
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
@@ -585,23 +524,24 @@ static void unload_unassigned(TSNode self, EditScriptBuffer *buffer) {
  * @param subtree_pool Pointer to the SubtreePool
  * @return Constructed Subtree
  */
-static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const char *self_code, const char *other_code,
-                               const TSLiteralMap *literal_map, const TSTree *self_tree, SubtreePool *subtree_pool) {
-  Subtree *other_subtree = (Subtree *) other.id;
+static Subtree
+load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLanguage *lang, const char *self_code,
+                const char *other_code,
+                const TSLiteralMap *literal_map, SubtreePool *subtree_pool) {
   TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   if (other_diff_heap->assigned != NULL) { // check if assigned
     // Assigned -> No LoadEdit needed -> try to update literals
-    const Subtree *assigned_subtree = other_diff_heap->assigned; // get the assigned Subtree in the original tree
-    TSNode assigned_node = ts_diff_heap_node(assigned_subtree, self_tree); // get the assigned node
-    update_literals_iter(assigned_node, other, buffer, self_code, other_code, literal_map); // update literals
+    Subtree *assigned_subtree = other_diff_heap->assigned; // get the assigned Subtree in the original tree
+    update_literals_rec(assigned_subtree, other_subtree, buffer, lang, self_code, other_code,
+                        literal_map); // update literals
     ts_subtree_retain(*assigned_subtree); // increment reference counter of the subtree, since we reuse it
     return *assigned_subtree;
   }
   other_diff_heap->share = NULL;
   void *new_id = generate_new_id(); // generate new ID for the new subtree
-  Length node_position = {.bytes=other.context[0], .extent={.row=other.context[1], .column=other.context[2]}};
-  Length node_padding = ts_subtree_padding(*other_subtree);
-  Length node_size = ts_subtree_size(*other_subtree);
+  Length node_position = other_diff_heap->position;
+  Length node_padding = other_diff_heap->padding;
+  Length node_size = other_diff_heap->size;
   TSDiffHeap *new_node_diff_heap = ts_diff_heap_new_with_id(node_position, node_padding, node_size,
                                                             new_id); // create new DiffHeap
   new_node_diff_heap->treeheight = other_diff_heap->treeheight;
@@ -617,9 +557,8 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
     for (uint32_t i = 0; i < ts_subtree_child_count(*other_subtree); i++) { // load children
-      TSNode other_kid = ts_real_node_child(other, i);
-      Subtree kid_subtree = load_unassigned(other_kid, buffer, self_code, other_code, literal_map, self_tree,
-                                            subtree_pool);
+      Subtree *other_kid = &ts_subtree_children(*other_subtree)[i];
+      Subtree kid_subtree = load_unassigned(other_kid, buffer, lang, self_code, other_code, literal_map, subtree_pool);
       TSDiffHeap *kid_diff_heap = ts_subtree_node_diff_heap(kid_subtree); // get the child's DiffHeap
       array_push(&child_prototypes, (ChildPrototype) {.child_id=kid_diff_heap->id});
       array_push(&kids, kid_subtree);
@@ -627,11 +566,11 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
     // Create new node
     MutableSubtree mut_node;
     if (ts_subtree_is_error(*other_subtree)) { // check for error node
-      Subtree err_node = ts_subtree_new_error_node(&kids, ts_subtree_extra(*other_subtree), self_tree->language);
+      Subtree err_node = ts_subtree_new_error_node(&kids, ts_subtree_extra(*other_subtree), lang);
       mut_node = ts_subtree_to_mut_unsafe(err_node);
     } else {
       mut_node = ts_subtree_new_node(ts_subtree_symbol(*other_subtree), &kids,
-                                     ts_subtree_production_id(*other_subtree), self_tree->language);
+                                     ts_subtree_production_id(*other_subtree), lang);
     }
     ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap); // assign DiffHeap to the new node
     Subtree new_node = ts_subtree_from_mut(mut_node);
@@ -677,7 +616,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
       new_leaf = ts_subtree_new_error(subtree_pool, lookahead_char, ts_subtree_padding(*other_subtree),
                                       ts_subtree_size(*other_subtree),
                                       ts_subtree_lookahead_bytes(*other_subtree),
-                                      ts_subtree_parse_state(*other_subtree), self_tree->language);
+                                      ts_subtree_parse_state(*other_subtree), lang);
     } else {
       new_leaf = ts_subtree_new_leaf(subtree_pool, ts_subtree_symbol(*other_subtree),
                                      ts_subtree_padding(*other_subtree),
@@ -686,7 +625,7 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
                                      ts_subtree_parse_state(*other_subtree),
                                      ts_subtree_has_external_tokens(*other_subtree),
                                      ts_subtree_depends_on_column(*other_subtree),
-                                     ts_subtree_is_keyword(*other_subtree), self_tree->language);
+                                     ts_subtree_is_keyword(*other_subtree), lang);
     }
     MutableSubtree mut_leaf = ts_subtree_to_mut_unsafe(new_leaf);
     if (ts_subtree_has_external_tokens(*other_subtree)) {
@@ -703,36 +642,37 @@ static Subtree load_unassigned(TSNode other, EditScriptBuffer *buffer, const cha
 /**
  * Computes an EditScript and constructs a new tree, that consists out of all the assigned nodes of the
  * original tree and newly loaded nodes.
- * @param self TSNode in the original tree
- * @param other TSNode in the changed tree
+ * @param this_subtree Pointer to a subtree in the original tree
+ * @param other_subtree Pointer to a subtree in the changed tree
  * @param parent_id ID of the parent node (or NULL if ROOT)
  * @param parent_type TSSymbol of the parent node (or UINT16_MAX if ROOT)
  * @param link Childindex of the parent node
  * @param buffer Pointer to the EditScriptBuffer
  * @param subtree_pool Pointer to the SubtreePool
+ * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
  * @param literal_map Pointer to the literalmap
  * @return Constructed Subtree
  */
-Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol parent_type, uint32_t link,
-                            EditScriptBuffer *buffer, SubtreePool *subtree_pool, const char *self_code,
-                            const char *other_code,
-                            const TSLiteralMap *literal_map) {
-  Subtree *this_subtree = (Subtree *) self.id;
+Subtree
+compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, void *parent_id, TSSymbol parent_type, uint32_t link,
+                    EditScriptBuffer *buffer, SubtreePool *subtree_pool, const TSLanguage *lang, const char *self_code,
+                    const char *other_code,
+                    const TSLiteralMap *literal_map) {
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
-  const TSDiffHeap *other_diff_heap = other.diff_heap;
+  const TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   Subtree *assigned_to_this = this_diff_heap->assigned;
   if (this_diff_heap->assigned != NULL && ts_subtree_node_diff_heap(*assigned_to_this)->id == other_diff_heap->id) {
     // self == other
-    update_literals_iter(self, other, buffer, self_code, other_code, literal_map);
+    update_literals_rec(this_subtree, other_subtree, buffer, lang, self_code, other_code, literal_map);
     this_diff_heap->assigned = NULL;
     ts_subtree_retain(*this_subtree); // increment subtree reference counter since we reuse this subtree
     return *this_subtree;
   } else if (this_diff_heap->assigned == NULL && other_diff_heap->assigned == NULL) {
     // No match -> recurse into
-    Subtree rec_gen_subtree = compute_edit_script_recurse(self, other, buffer, subtree_pool, self_code, other_code,
-                                                          literal_map);
+    Subtree rec_gen_subtree = compute_edit_script_recurse(this_subtree, other_subtree, buffer, subtree_pool, lang,
+                                                          self_code, other_code, literal_map);
     if (rec_gen_subtree.ptr != NULL) {
       return rec_gen_subtree;
     }
@@ -750,8 +690,8 @@ Subtree compute_edit_script(TSNode self, TSNode other, void *parent_id, TSSymbol
                               .edit_tag=DETACH,
                               .detach=detach_data
                             });
-  unload_unassigned(self, buffer);  // unload all unassigned subtrees (in the original tree)
-  Subtree new_subtree = load_unassigned(other, buffer, self_code, other_code, literal_map, self.tree,
+  unload_unassigned(this_subtree, buffer);  // unload all unassigned subtrees (in the original tree)
+  Subtree new_subtree = load_unassigned(other_subtree, buffer, lang, self_code, other_code, literal_map,
                                         subtree_pool); // load all unassigned subtrees (in the changed tree)
   TSDiffHeap *new_subtree_diff_heap = ts_subtree_node_diff_heap(new_subtree);
   // Attach new subtree
@@ -784,14 +724,17 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
               const TSLiteralMap *literal_map) {
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
+  Subtree *self_subtree = (Subtree *) self.id;
+  Subtree *other_subtree = (Subtree *) other.id;
   SubtreeRegistry *registry = ts_subtree_registry_create(); // create new SubtreeRegistry
-  assign_shares(self, other, registry); // STEP 2: Assign shares
-  assign_subtrees(other, registry); // STEP 3: Assign subtrees
+  assign_shares(self_subtree, other_subtree, registry); // STEP 2: Assign shares
+  assign_subtrees(other_subtree, registry); // STEP 3: Assign subtrees
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create(); // create new EditScriptBuffer
   SubtreePool subtree_pool = ts_subtree_pool_new(32); // create new SubtreePool
   // STEP 4: Compute EditScript and construct new Subtree
-  Subtree computed_subtree = compute_edit_script(self, other, NULL, UINT16_MAX, 0, &edit_script_buffer, &subtree_pool,
-                                                 self_code, other_code, literal_map);
+  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, NULL, UINT16_MAX, 0, &edit_script_buffer,
+                                                 &subtree_pool, this_tree->language, self_code, other_code,
+                                                 literal_map);
   EditScript *edit_script = ts_edit_script_buffer_finalize(
     &edit_script_buffer); // Convert EditScriptBuffer to EditScript
   // Construct new tree
@@ -801,7 +744,7 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  bool success = ts_subtree_eq(*(Subtree *) other.id, computed_subtree) == 0; // test equality
+  bool success = ts_subtree_eq(*other_subtree, computed_subtree) == 0; // test equality
   // Cleanup
   ts_subtree_registry_clean_delete(registry);
   ts_subtree_pool_delete(&subtree_pool);
@@ -823,15 +766,18 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
                                        const TSLiteralMap *literal_map, FILE *graph_file) {
   TSNode self = ts_tree_root_node(this_tree);
   TSNode other = ts_tree_root_node(that_tree);
+  Subtree *self_subtree = (Subtree *) self.id;
+  Subtree *other_subtree = (Subtree *) other.id;
   SubtreeRegistry *registry = ts_subtree_registry_create(); // create new SubtreeRegistry
-  assign_shares(self, other, registry); // STEP 2: Assign shares
-  assign_subtrees(other, registry); // STEP 3: Assign subtrees
+  assign_shares(self_subtree, other_subtree, registry); // STEP 2: Assign shares
+  assign_subtrees(other_subtree, registry); // STEP 3: Assign subtrees
   ts_tree_diff_graph(self, other, this_tree->language, graph_file); // generate AssignmentGraph
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create(); // create new EditScriptBuffer
   SubtreePool subtree_pool = ts_subtree_pool_new(32); // create new SubtreePool
   // STEP 4: Compute EditScript and construct new Subtree
-  Subtree computed_subtree = compute_edit_script(self, other, NULL, UINT16_MAX, 0, &edit_script_buffer, &subtree_pool,
-                                                 self_code, other_code, literal_map);
+  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, NULL, UINT16_MAX, 0, &edit_script_buffer,
+                                                 &subtree_pool, this_tree->language, self_code, other_code,
+                                                 literal_map);
   EditScript *edit_script = ts_edit_script_buffer_finalize(
     &edit_script_buffer); // Convert EditScriptBuffer to EditScript
   // Construct new tree
@@ -841,7 +787,7 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
     that_tree->included_ranges, // TODO: Calculate values
     that_tree->included_range_count
   );
-  bool success = ts_subtree_eq(*(Subtree *) other.id, computed_subtree) == 0; // test equality
+  bool success = ts_subtree_eq(*other_subtree, computed_subtree) == 0; // test equality
   // Cleanup
   ts_subtree_registry_clean_delete(registry);
   ts_subtree_pool_delete(&subtree_pool);

@@ -6,29 +6,20 @@ typedef struct {
 } HashmapResult;
 
 /**
- * Traverse a subtree and apply a callback function to every node
- * @param node TSNode root
+ * Assign and register shares for all subtrees
+ * @param subtree Pointer to a subtree
  * @param registry Pointer to the SubtreeRegistry
- * @param f Callback function that expects a TSNode and a Pointer to the SubtreeRegistry
  */
-static void foreach_subtree(TSNode node, SubtreeRegistry *registry, void (*f)(TSNode, SubtreeRegistry *)) {
-  TSTreeCursor cursor = ts_tree_cursor_new(node);
-  int lvl = 0;
-  TSNode curr;
-  do {
-    curr = ts_tree_cursor_current_node(&cursor);
-    f(curr, registry);
-    while (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-      lvl++;
-      curr = ts_tree_cursor_current_node(&cursor);
-      f(curr, registry);
-    }
-    while (!(ts_diff_tree_cursor_goto_next_sibling(&cursor)) && lvl > 0) {
-      lvl--;
-      ts_diff_tree_cursor_goto_parent(&cursor);
-    }
-  } while (lvl > 0);
-  ts_tree_cursor_delete(&cursor);
+static void foreach_subtree_take_tree_assign(Subtree *subtree, SubtreeRegistry *registry) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  if (diff_heap->assigned != NULL) {
+    Subtree *that_subtree = diff_heap->assigned;
+    ts_subtree_registry_assign_share_and_register_tree(registry, that_subtree);
+  }
+  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
+    Subtree *child = &ts_subtree_children(*subtree)[i];
+    foreach_subtree_take_tree_assign(child, registry);
+  }
 }
 
 /**
@@ -60,18 +51,14 @@ static int iterator_first_element(void *const context, void *const value) {
 /**
  * Traverses all childs of the given node and deregisters them as available trees from their shares.
  *
- * @param node TSNode
+ * @param subtree Pointer to a subtree
  * @param registry Pointer to the SubtreeRegistry
  */
-static void deregister_foreach_subtree(TSNode node, SubtreeRegistry *registry) {
-  TSTreeCursor cursor = ts_tree_cursor_new(node);
-  if (ts_diff_tree_cursor_goto_first_child(&cursor)) {
-    do {
-      TSNode child = ts_tree_cursor_current_node(&cursor);
-      ts_subtree_share_deregister_available_tree(child, registry);
-    } while (ts_diff_tree_cursor_goto_next_sibling(&cursor));
+static void deregister_foreach_subtree(Subtree *subtree, SubtreeRegistry *registry) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(*subtree); i++) {
+    Subtree *child = &ts_subtree_children(*subtree)[i];
+    ts_subtree_share_deregister_available_tree(child, registry);
   }
-  ts_tree_cursor_delete(&cursor);
 }
 
 /**
@@ -92,42 +79,30 @@ static inline void remove_preferred_tree(SubtreeShare *share, TSDiffHeap *diff_h
   }
 }
 
-/**
- * Foreach callback function
- * @param node TSNode
- * @param registry Pointer to the SubtreeRegistry
- */
-static void take_tree_assign_foreach(TSNode node, SubtreeRegistry *registry) {
-  TSDiffHeap *diff_heap = (TSDiffHeap *) node.diff_heap;
-  if (diff_heap->assigned != NULL) {
-    Subtree *that_subtree = diff_heap->assigned;
-    ts_subtree_registry_assign_share_and_register_tree(registry, that_subtree);
-  }
-}
 
 /**
  * Take an available tree and make it (and all subtrees) unavailable
  * @param self Pointer to the SubtreeShare
- * @param tree Target TSNode in the original tree
- * @param that Corresponding TSNode in the changed tree
+ * @param this_subtree Point to the target subtree in the original tree
+ * @param that_subtree Corresponding subtree in the changed tree
  * @param registry Pointer to the SubtreeRegistry
  * @return Pointer to the original Subtree
  */
-static Subtree *take_tree(const SubtreeShare *self, TSNode tree, TSNode that, SubtreeRegistry *registry) {
-  TSDiffHeap *diff_heap = (TSDiffHeap *) tree.diff_heap;
+static Subtree *
+take_tree(const SubtreeShare *self, Subtree *this_subtree, Subtree *that_subtree, SubtreeRegistry *registry) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*this_subtree);
   SubtreeShare *share = diff_heap->share;
   assert(share != NULL);
   // Remove the original tree from the available_tree hashmap and the preferred_trees radix trie
   // Thereby the subtree is no longer available
   hashmap_remove(self->available_trees, (char *) &diff_heap->id, sizeof(void *));
-  remove_preferred_tree(share, diff_heap, (Subtree *) tree.id);
+  remove_preferred_tree(share, diff_heap, this_subtree);
   diff_heap->share = NULL;
 
   // The subtrees of this tree are also no longer available -> deregister
-  deregister_foreach_subtree(tree, registry);
-
-  foreach_subtree(that, registry, take_tree_assign_foreach);
-  return (Subtree *) tree.id;
+  deregister_foreach_subtree(this_subtree, registry);
+  foreach_subtree_take_tree_assign(that_subtree, registry);
+  return this_subtree;
 }
 
 /**
@@ -196,15 +171,14 @@ rax *ts_subtree_share_preferred_trees(SubtreeShare *self) {
  * Look for a fitting available tree in the SubtreeShare.
  *
  * @param self Pointer to the SubtreeShare
- * @param node TSNode in the changed tree
+ * @param subtree Pointer to a subtree in the changed tree
  * @param preferred Should it use the literal hash - use structural hash otherwise
  * @param registry Pointer to the SubtreeRegistry
  * @return Pointer to an available Subtree or NULL if none found
  */
 Subtree *
-ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool preferred,
+ts_subtree_share_take_available_tree(SubtreeShare *self, Subtree *subtree, bool preferred,
                                      SubtreeRegistry *registry) {
-  Subtree *subtree = (Subtree *) node.id;
   Subtree *res;
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (preferred) {
@@ -225,25 +199,24 @@ ts_subtree_share_take_available_tree(SubtreeShare *self, TSNode node, bool prefe
   if (res == NULL) {
     return res;
   }
-  TSNode res_node = ts_diff_heap_node(res, node.tree);
-  return take_tree(self, res_node, node, registry);
+  return take_tree(self, res, subtree, registry);
 }
 
 /**
  * Deregister an available tree
- * @param node TSNode
+ * @param subtree Pointer to a subtree
  * @param registry Pointer to the SubtreeRegistry
  */
-void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *registry) {
-  TSDiffHeap *diff_heap = (TSDiffHeap *) node.diff_heap;
+void ts_subtree_share_deregister_available_tree(Subtree *subtree, SubtreeRegistry *registry) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (diff_heap->share != NULL) {
     // Subtree has not been taken previously
     SubtreeShare *share = diff_heap->share;
     // Remove subtree from share, remove share from subtree and deregister all subtrees
     hashmap_remove(share->available_trees, (char *) &diff_heap->id, sizeof(void *));
-    remove_preferred_tree(share, diff_heap, (Subtree *) node.id);
+    remove_preferred_tree(share, diff_heap, subtree);
     share = NULL;
-    deregister_foreach_subtree(node, registry);
+    deregister_foreach_subtree(subtree, registry);
   } else if (diff_heap->assigned != NULL) {
     // Subtree has been taken previously but was part of a larger subtree
     Subtree *assigned_subtree = diff_heap->assigned;
@@ -251,7 +224,6 @@ void ts_subtree_share_deregister_available_tree(TSNode node, SubtreeRegistry *re
     // Reset all assignments and reassign shares
     diff_heap->assigned = NULL;
     assigned_diff_heap->assigned = NULL;
-    TSNode assigned_node = ts_diff_heap_node(assigned_subtree, node.tree);
-    foreach_tree_assign_share(assigned_node, registry);
+    foreach_tree_assign_share(assigned_subtree, registry);
   }
 }

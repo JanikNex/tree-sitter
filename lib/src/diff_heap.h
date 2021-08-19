@@ -42,16 +42,13 @@ typedef struct {
 
 typedef Array(NodeEntry) NodeEntryArray;
 
-TSNode ts_diff_heap_node(const Subtree *, const TSTree *);
+Subtree
+compute_edit_script_recurse(Subtree *, Subtree *, EditScriptBuffer *, SubtreePool *, const TSLanguage *, const char *,
+                            const char *, const TSLiteralMap *);
 
 Subtree
-compute_edit_script_recurse(TSNode, TSNode, EditScriptBuffer *, SubtreePool *, const char *, const char *,
-                            const TSLiteralMap *);
-
-Subtree
-compute_edit_script(TSNode, TSNode, void *, TSSymbol, uint32_t, EditScriptBuffer *, SubtreePool *, const char *,
-                    const char *,
-                    const TSLiteralMap *);
+compute_edit_script(Subtree *, Subtree *, void *, TSSymbol, uint32_t, EditScriptBuffer *, SubtreePool *,
+                    const TSLanguage *, const char *, const char *, const TSLiteralMap *);
 
 uint32_t ts_real_node_child_count(TSNode);
 
@@ -308,12 +305,11 @@ foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
 
 /**
  * Assigns a share to each subtree (including the root)
- * @param node
- * @param registry
+ * @param subtree Pointer to a subtree
+ * @param registry Pointer to the SubtreeRegistry
  */
 static inline void
-foreach_tree_assign_share(TSNode node, SubtreeRegistry *registry) {
-  Subtree *subtree = (Subtree *) node.id;
+foreach_tree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (!diff_heap->skip_node) {
     ts_subtree_registry_assign_share(registry, subtree);
@@ -342,12 +338,11 @@ static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtr
 
 /**
  * Assigns a share to each sub-tree and registers it as an available tree (including the root)
- * @param node TSNode
+ * @param subtree Pointer to a subtree
  * @param registry Pointer to the SubtreeRegistry
  */
 static inline void
-foreach_tree_assign_share_and_register_tree(TSNode node, SubtreeRegistry *registry) {
-  Subtree *subtree = (Subtree *) node.id;
+foreach_tree_assign_share_and_register_tree(Subtree *subtree, SubtreeRegistry *registry) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
   if (!diff_heap->skip_node) {
     ts_subtree_registry_assign_share_and_register_tree(registry, subtree);

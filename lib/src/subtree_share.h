@@ -15,9 +15,9 @@ void ts_subtree_share_register_available_tree(const SubtreeShare *, Subtree *);
 
 rax *ts_subtree_share_preferred_trees(SubtreeShare *);
 
-Subtree *ts_subtree_share_take_available_tree(SubtreeShare *, TSNode, bool, SubtreeRegistry *);
+Subtree *ts_subtree_share_take_available_tree(SubtreeShare *, Subtree *, bool, SubtreeRegistry *);
 
-void ts_subtree_share_deregister_available_tree(TSNode, SubtreeRegistry *);
+void ts_subtree_share_deregister_available_tree(Subtree *, SubtreeRegistry *);
 
 
 #endif //TREE_SITTER_SUBTREE_SHARE_H
