@@ -143,12 +143,10 @@ void ts_subtree_share_delete(SubtreeShare *self) {
  */
 void ts_subtree_share_register_available_tree(const SubtreeShare *self, Subtree *subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (!diff_heap->skip_node) {
-    hashmap_put(self->available_trees, (char *) &diff_heap->id, sizeof(void *), subtree);
-    if (self->_preferred_trees != NULL) {
-      raxInsert(self->_preferred_trees, (unsigned char *) &diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
-                subtree, NULL);
-    }
+  hashmap_put(self->available_trees, (char *) &diff_heap->id, sizeof(void *), subtree);
+  if (self->_preferred_trees != NULL) {
+    raxInsert(self->_preferred_trees, (unsigned char *) &diff_heap->literal_hash, sizeof(diff_heap->literal_hash),
+              subtree, NULL);
   }
 }
 

@@ -170,14 +170,6 @@ assign_shares(Subtree *this_subtree, Subtree *that_subtree,
               SubtreeRegistry *registry) { // TODO: Possible without recursion?
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
   TSDiffHeap *that_diff_heap = ts_subtree_node_diff_heap(*that_subtree);
-  if (this_diff_heap->skip_node) {
-    foreach_tree_assign_share(that_subtree, registry);
-    return;
-  }
-  if (that_diff_heap->skip_node) {
-    foreach_tree_assign_share_and_register_tree(this_subtree, registry);
-    return;
-  }
 
   SubtreeShare *this_share = NULL;
   SubtreeShare *that_share = NULL;
@@ -238,9 +230,7 @@ select_available_tree(NodeEntryArray *nodes, const bool preferred, SubtreeRegist
     }
     Subtree *subtree = entry->subtree;
     TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-    if (diff_heap->skip_node) {
-      continue;
-    } else if (diff_heap->assigned != NULL) {
+    if (diff_heap->assigned != NULL) {
       entry->valid = false; // set invalid if assigned
     } else {
       SubtreeShare *node_share = diff_heap->share;

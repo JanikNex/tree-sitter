@@ -52,9 +52,7 @@ void ts_subtree_registry_clean_delete(SubtreeRegistry *self) {
  */
 SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *self, Subtree *subtree) {
   TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (diff_heap->skip_node) {
-    return NULL;
-  }
+
   // Reset assigned
   diff_heap->assigned = NULL;
   // Search for a share by structural hash in the registry
@@ -78,10 +76,6 @@ SubtreeShare *ts_subtree_registry_assign_share(const SubtreeRegistry *self, Subt
  * @return Assigned SubtreeShare
  */
 SubtreeShare *ts_subtree_registry_assign_share_and_register_tree(const SubtreeRegistry *self, Subtree *subtree) {
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (diff_heap->skip_node) {
-    return NULL;
-  }
   SubtreeShare *share = ts_subtree_registry_assign_share(self, subtree);
   ts_subtree_share_register_available_tree(share, subtree);
   return share;

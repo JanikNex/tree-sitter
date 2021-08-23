@@ -21,7 +21,6 @@ extern "C" {
 // of a node is increased by just one byte, that can hold a pointer to a DiffHeap.
 struct TSDiffHeap {
   void *id;
-  bool skip_node;
   volatile uint32_t ref_count;
   const unsigned char structural_hash[SHA256_HASH_SIZE];
   unsigned char literal_hash[SHA256_HASH_SIZE];
@@ -90,7 +89,6 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length si
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = generate_new_id();
   node_diff_heap->preemptive_assignment = NULL;
-  node_diff_heap->skip_node = false;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
   node_diff_heap->position = pos;
@@ -112,7 +110,6 @@ static inline TSDiffHeap *ts_diff_heap_new(Length pos, Length padding, Length si
 static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, Length padding, Length size, void *id) {
   TSDiffHeap *node_diff_heap = ts_malloc(sizeof(TSDiffHeap));
   node_diff_heap->id = id;
-  node_diff_heap->skip_node = false;
   node_diff_heap->preemptive_assignment = NULL;
   node_diff_heap->assigned = NULL;
   node_diff_heap->share = NULL;
@@ -132,7 +129,6 @@ static inline TSDiffHeap *ts_diff_heap_new_with_id(Length pos, Length padding, L
  */
 static inline TSDiffHeap *ts_diff_heap_reuse(TSDiffHeap *diff_heap) {
   TSDiffHeap *new_diff_heap = ts_diff_heap_new(diff_heap->position, LENGTH_UNDEFINED, LENGTH_UNDEFINED);
-  new_diff_heap->skip_node = diff_heap->skip_node;
   new_diff_heap->treeheight = diff_heap->treeheight;
   new_diff_heap->treesize = diff_heap->treesize;
   memcpy((void *) &new_diff_heap->structural_hash[0], diff_heap->structural_hash, SHA256_HASH_SIZE);
@@ -310,10 +306,7 @@ foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
  */
 static inline void
 foreach_tree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (!diff_heap->skip_node) {
-    ts_subtree_registry_assign_share(registry, subtree);
-  }
+  ts_subtree_registry_assign_share(registry, subtree);
   foreach_subtree_assign_share(subtree, registry);
 }
 
@@ -343,10 +336,7 @@ static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtr
  */
 static inline void
 foreach_tree_assign_share_and_register_tree(Subtree *subtree, SubtreeRegistry *registry) {
-  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
-  if (!diff_heap->skip_node) {
-    ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
-  }
+  ts_subtree_registry_assign_share_and_register_tree(registry, subtree);
   foreach_subtree_assign_share_and_register_tree(subtree, registry);
 }
 
