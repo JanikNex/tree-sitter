@@ -171,32 +171,23 @@ assign_shares(Subtree *this_subtree, Subtree *that_subtree,
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
   TSDiffHeap *that_diff_heap = ts_subtree_node_diff_heap(*that_subtree);
 
-  SubtreeShare *this_share = NULL;
-  SubtreeShare *that_share = NULL;
+
   if (this_diff_heap->preemptive_assignment != NULL && this_diff_heap->preemptive_assignment == that_diff_heap) {
     // Both subtrees got the same share -> preemptive assignment
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
     return;
   }
-  if (this_diff_heap->preemptive_assignment != NULL) {
-    try_preemptive_assignment(registry, this_subtree, this_diff_heap);
-  } else {
-    this_share = ts_subtree_registry_assign_share(registry, this_subtree);
-  }
-  if (that_diff_heap->preemptive_assignment != NULL) {
-    try_preemptive_assignment(registry, that_subtree, that_diff_heap);
-  } else {
-    that_share = ts_subtree_registry_assign_share(registry, that_subtree);
-  }
 
+  SubtreeShare *this_share = ts_subtree_registry_assign_share(registry, this_subtree);
+  SubtreeShare *that_share = ts_subtree_registry_assign_share(registry, that_subtree);
 
   // Assign shares or look into the IncrementalRegistry and search for an assignment if preemptive_assigned
-  if (this_share != NULL && this_share == that_share) {
+  if (this_share == that_share) {
     // Both subtrees got the same share -> preemptive assignment
     assign_tree(this_subtree, that_subtree, this_diff_heap, that_diff_heap);
   } else {
     // Subtrees got different shares
-    if (this_share != NULL && that_share != NULL && is_signature_equal(this_subtree, that_subtree)) { // check signature
+    if (is_signature_equal(this_subtree, that_subtree)) { // check signature
       // Signatures are equal -> recurse simultaneously
       ts_subtree_share_register_available_tree(this_share, this_subtree);
       for (uint32_t i = 0; i < ts_subtree_child_count(*this_subtree); i++) {
@@ -206,8 +197,8 @@ assign_shares(Subtree *this_subtree, Subtree *that_subtree,
       }
     } else {
       // Signatures are not equal -> recurse separately
-      if (this_share != NULL) { foreach_tree_assign_share_and_register_tree(this_subtree, registry); }
-      if (that_share != NULL) { foreach_subtree_assign_share(that_subtree, registry); }
+      foreach_tree_assign_share_and_register_tree(this_subtree, registry);
+      foreach_subtree_assign_share(that_subtree, registry);
     }
   }
 
