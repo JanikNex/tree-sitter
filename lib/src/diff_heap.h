@@ -8,6 +8,7 @@ extern "C" {
 #include "tree_sitter/api.h"
 #include "sha_digest/sha256.h"
 #include "subtree.h"
+#include "subtree_share.h"
 #include "literal_map.h"
 #include "tree_cursor.h"
 #include "subtree_registry.h"
@@ -178,12 +179,18 @@ static inline Subtree ts_diff_heap_del(Subtree subtree) {
  * @param registry Pointer to the SubtreeRegistry
  * @param this_subtree Pointer to the current Subtree
  * @param this_diff_heap Pointer to the TSDiffHeap of the current Subtree
+ * @param deregister Boolean whether this_subtree is part of the original or the modified TSTree
+ * @return bool Boolean whether a real assignment was formed
  */
 static inline bool
-try_preemptive_assignment(SubtreeRegistry *registry, Subtree *this_subtree, TSDiffHeap *this_diff_heap) {
+try_preemptive_assignment(SubtreeRegistry *registry, Subtree *this_subtree, TSDiffHeap *this_diff_heap,
+                          bool deregister) {
   Subtree *assigned_subtree = ts_subtree_registry_find_incremental_assignment(registry, this_subtree);
   if (assigned_subtree != NULL) {
     TSDiffHeap *assigned_diff_heap = ts_subtree_node_diff_heap(*assigned_subtree);
+    if (deregister) {
+      ts_subtree_share_take_preassigned_tree(assigned_subtree, registry);
+    }
     this_diff_heap->assigned = assigned_subtree;
     this_diff_heap->preemptive_assignment = NULL;
     assigned_diff_heap->assigned = this_subtree;
@@ -293,7 +300,7 @@ foreach_subtree_assign_share(Subtree *subtree, SubtreeRegistry *registry) {
     Subtree *child = &ts_subtree_children(*subtree)[i];
     TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
     if (child_diff_heap->preemptive_assignment != NULL) {
-      if (try_preemptive_assignment(registry, child, child_diff_heap)) {
+      if (try_preemptive_assignment(registry, child, child_diff_heap, true)) {
         continue;
       }
     }
@@ -323,7 +330,7 @@ static inline void foreach_subtree_assign_share_and_register_tree(Subtree *subtr
     Subtree *child = &ts_subtree_children(*subtree)[i];
     TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
     if (child_diff_heap->preemptive_assignment != NULL) {
-      if (try_preemptive_assignment(registry, child, child_diff_heap)) {
+      if (try_preemptive_assignment(registry, child, child_diff_heap, false)) {
         continue;
       }
     }

@@ -225,3 +225,23 @@ void ts_subtree_share_deregister_available_tree(Subtree *subtree, SubtreeRegistr
     foreach_tree_assign_share(assigned_subtree, registry);
   }
 }
+
+/**
+ * Deregister the nodes of a subtree from their shares to prevent multiple
+ * assignments of the same subtree
+ * @param subtree Pointer to a subtree in the original TSTree
+ * @param registry Pointer to the SubtreeRegistry
+ */
+void ts_subtree_share_take_preassigned_tree(Subtree *subtree, SubtreeRegistry *registry) {
+  TSDiffHeap *diff_heap = ts_subtree_node_diff_heap(*subtree);
+  SubtreeShare *share = diff_heap->share;
+  assert(share != NULL);
+  // Remove the original tree from the available_tree hashmap and the preferred_trees radix trie
+  // Thereby the subtree is no longer available
+  hashmap_remove(share->available_trees, (char *) &diff_heap->id, sizeof(void *));
+  remove_preferred_tree(share, diff_heap, subtree);
+  diff_heap->share = NULL;
+
+  // The subtrees of this tree are also no longer available -> deregister
+  deregister_foreach_subtree(subtree, registry);
+}

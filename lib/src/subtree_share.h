@@ -19,5 +19,7 @@ Subtree *ts_subtree_share_take_available_tree(SubtreeShare *, Subtree *, bool, S
 
 void ts_subtree_share_deregister_available_tree(Subtree *, SubtreeRegistry *);
 
+void ts_subtree_share_take_preassigned_tree(Subtree *, SubtreeRegistry *);
+
 
 #endif //TREE_SITTER_SUBTREE_SHARE_H
