@@ -17,6 +17,181 @@ bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2
 }
 
 /**
+ * Tests if the current subtree is relevant for the abstract edit script
+ * @param sub Current subtree
+ * @param lit_map Pointer to the TSLiteralMap
+ * @return bool whether the subtree is relevant
+ */
+static inline bool is_relevant(Subtree sub, const TSLiteralMap *lit_map) {
+  if (!ts_subtree_visible(sub)) {
+    return false;
+  }
+  if (ts_subtree_named(sub)) {
+    return true;
+  }
+  if (ts_literal_map_is_unnamed_token(lit_map, ts_subtree_symbol(sub))) {
+    return true;
+  } else {
+  }
+  return false;
+}
+
+/**
+ * Generate a new ParentData struct based on the current subtree and its parent data
+ * @param subtree Current subtree
+ * @param pd ParenData of the current subtree
+ * @param idx Current index
+ * @param cpa Pointer to the ChildPrototypeArray
+ * @param lang Pointer to the TSLanguage
+ * @return new ParentData struct
+ */
+static inline ParentData
+generate_new_pd(Subtree subtree, ParentData pd, uint32_t idx, ChildPrototypeArray *cpa, const TSLanguage *lang) {
+  bool is_field = false;
+  const TSFieldMapEntry *field_map;
+  const TSFieldMapEntry *field_map_end;
+  ts_language_field_map(
+    lang,
+    ts_subtree_production_id(subtree),
+    &field_map, &field_map_end
+  );
+  TSFieldId field_id;
+  for (const TSFieldMapEntry *field = field_map; field < field_map_end; field++) {
+    if (!field->inherited && field->child_index == idx) {
+      is_field = true;
+      field_id = field->field_id;
+    }
+  }
+  if (!ts_subtree_visible(subtree)) {
+    // Return the old ParentData unchanged if the current subtree is invisible
+    return pd;
+  } else {
+    TSSymbol parent_symbol;
+    uint16_t parent_production;
+    if (ts_subtree_visible(subtree)) {
+      parent_symbol = ts_subtree_symbol(subtree);
+      parent_production = ts_subtree_production_id(subtree);
+    } else {
+      parent_symbol = pd.parent_symbol;
+      parent_production = pd.production_id;
+    }
+    if (is_field) {
+      return (ParentData) {
+        .parent_symbol = parent_symbol,
+        .production_id = parent_production,
+        .parent_id = ts_subtree_node_diff_heap(subtree)->id,
+        .is_field = true,
+        .field_id = field_id,
+        .cpa = cpa
+      };
+    } else {
+      return (ParentData) {
+        .parent_symbol = parent_symbol,
+        .production_id = parent_production,
+        .parent_id = ts_subtree_node_diff_heap(subtree)->id,
+        .is_field = false,
+        .link = idx,
+        .cpa = cpa
+      };
+    }
+  }
+}
+
+static inline void push_abstract_child_prototype_(void *id, ParentData pd, ChildPrototypeArray *cpa) {
+  ChildPrototype acp = {
+    .child_id=id,
+    .is_field=pd.is_field
+  };
+  if (pd.is_field) {
+    acp.field_id = pd.field_id;
+  } else {
+    acp.link = pd.link;
+  }
+  array_push(cpa, acp);
+}
+
+static inline void push_abstract_child_prototype(void *id, ParentData pd) {
+  push_abstract_child_prototype_(id, pd, pd.cpa);
+}
+
+static void unload_list(Subtree sub, const TSLiteralMap *lit_map, ParentData *pd, uint32_t cleaned_link,
+                        ChildPrototypeArray *child_prototypes, const TSLanguage *lang) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(sub); i++) {
+    Subtree child = ts_subtree_children(sub)[i];
+    ParentData child_pd = child_pd = generate_new_pd(sub, *pd, i, child_prototypes, lang);
+    if (is_relevant(child, lit_map)) {
+      push_abstract_child_prototype_(ts_subtree_node_diff_heap(child)->id, child_pd, child_prototypes);
+    } else {
+      unload_list(child, lit_map, &child_pd, cleaned_link, child_prototypes, lang);
+    }
+  }
+}
+
+static inline void create_missing_detach(Subtree sub, EditScriptBuffer *buffer, ParentData pd) {
+  Detach detach_data = {
+    .id=ts_subtree_node_diff_heap(sub)->id,
+    .tag=ts_subtree_symbol(sub),
+    .is_field=pd.is_field,
+    .parent_id=pd.parent_id,
+    .parent_tag=pd.parent_symbol
+  };
+  if (pd.is_field) {
+    detach_data.field_id = pd.field_id;
+  } else {
+    detach_data.link = pd.link;
+  }
+  ts_edit_script_buffer_add(buffer,
+                            (SugaredEdit) {
+                              .edit_tag=DETACH,
+                              .detach=detach_data
+                            });
+}
+
+static inline void
+load_reused(Subtree reused_subtree, ParentData pd, const TSLiteralMap *lit_map) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(reused_subtree); i++) {
+    Subtree reused_child = ts_subtree_children(reused_subtree)[i];
+    if (is_relevant(reused_child, lit_map)) {
+      push_abstract_child_prototype(ts_subtree_node_diff_heap(reused_child)->id, pd);
+    } else {
+      load_reused(reused_child, pd, lit_map);
+    }
+  }
+}
+
+static inline void
+attach_next_root(Subtree sub, Subtree reference, ParentData pd, EditScriptBuffer *buffer, const TSLiteralMap *lit_map) {
+  for (uint32_t i = 0; i < ts_subtree_child_count(sub); i++) {
+    Subtree child = ts_subtree_children(sub)[i];
+    Subtree reference_child = ts_subtree_children(reference)[i];
+    if (ts_subtree_node_diff_heap(reference_child)->assigned != NULL) {
+      continue;
+    }
+    if (is_relevant(child, lit_map)) {
+      Attach attach_data = {
+        .id=ts_subtree_node_diff_heap(child)->id,
+        .tag=ts_subtree_symbol(child),
+        .is_field=pd.is_field,
+        .parent_tag=pd.parent_symbol,
+        .parent_id=pd.parent_id
+      };
+      if (pd.is_field) {
+        attach_data.field_id = pd.field_id;
+      } else {
+        attach_data.link = pd.link;
+      }
+      ts_edit_script_buffer_add(buffer,
+                                (SugaredEdit) {
+                                  .edit_tag=ATTACH,
+                                  .attach=attach_data
+                                });
+    } else {
+      attach_next_root(child, reference_child, pd, buffer, lit_map);
+    }
+  }
+}
+
+/**
  * Initializes a subtree starting at the current cursor position
  * @param cursor Pointer to a TSTreeCursor
  * @param code Pointer to the corresponding source code
@@ -340,15 +515,6 @@ update_literals(Subtree *self_subtree, Subtree *other_subtree, EditScriptBuffer 
                                 });
     }
   }
-  if (padding_change) { // Create UpdatePaddingEdit if the padding has been changed
-    UpdatePadding update_padding_data = {
-      .id=self_diff_heap->id,
-      .tag=ts_subtree_symbol(*self_subtree),
-      .old_padding=self_padding,
-      .new_padding=other_padding
-    };
-    ts_edit_script_buffer_add(buffer, (SugaredEdit) {.edit_tag=UPDATE_PADDING, .update_padding=update_padding_data});
-  }
   // update node in the original tree if needed
   if (is_literal || size_change || padding_change || subtree_has_changes) {
     MutableSubtree mut_subtree = ts_subtree_to_mut_unsafe(*self_subtree);
@@ -409,6 +575,7 @@ static void update_literals_rec(Subtree *self, Subtree *other, EditScriptBuffer 
  * @param this_subtree Pointer to a subtree in the original tree
  * @param other_subtree Pointer to a subtree in the changed tree
  * @param buffer Pointer to the EditScriptBuffer
+ * @param pd ParentData of the current subtree
  * @param subtree_pool Pointer to the SubtreePool
  * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
@@ -417,7 +584,7 @@ static void update_literals_rec(Subtree *self, Subtree *other, EditScriptBuffer 
  * @return Constructed subtree or NULL_SUBTREE if signature does not match
  */
 Subtree compute_edit_script_recurse(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuffer *buffer,
-                                    SubtreePool *subtree_pool,
+                                    SubtreePool *subtree_pool, ParentData pd,
                                     const TSLanguage *lang,
                                     const char *self_code,
                                     const char *other_code,
@@ -431,9 +598,9 @@ Subtree compute_edit_script_recurse(Subtree *this_subtree, Subtree *other_subtre
       Subtree *this_kid = &ts_subtree_children(*this_subtree)[i];
       Subtree *other_kid = &ts_subtree_children(*other_subtree)[i];
       // compute editscript and constructed subtree of this child
-      Subtree kid_subtree = compute_edit_script(this_kid, other_kid, this_diff_heap->id,
-                                                ts_subtree_symbol(*this_subtree), i,
-                                                buffer, subtree_pool, lang, self_code, other_code, literal_map);
+      ParentData child_pd = generate_new_pd(*this_subtree, pd, i, NULL, lang);
+      Subtree kid_subtree = compute_edit_script(this_kid, other_kid, buffer, subtree_pool, child_pd, lang, self_code,
+                                                other_code, literal_map);
       array_push(&subtree_array, kid_subtree);
     }
     // Update DiffHeaps
@@ -470,33 +637,43 @@ Subtree compute_edit_script_recurse(Subtree *this_subtree, Subtree *other_subtre
  * for all unassigned nodes.
  * @param self_subtree Pointer to a subtree in the original tree
  * @param buffer Pointer to the EditScriptBuffer
+ * @param pd ParentData of the current subtree
+ * @param lit_map Pointer to the TSLiteralMap
+ * @param lang Pointer to the TSLanguage
  */
-static void unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer) {
+static void
+unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer, ParentData pd, const TSLiteralMap *lit_map,
+                  const TSLanguage *lang) {
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*self_subtree);
   this_diff_heap->share = NULL; // reset share
   if (this_diff_heap->assigned != NULL) { // check if assigned
     this_diff_heap->assigned = NULL; // reset assignment
+    if (pd.needs_action && is_relevant(*self_subtree, lit_map)) {
+      create_missing_detach(*self_subtree, buffer, pd);
+    }
   } else {
     // create basic unload
-    Unload unload_data = {
-      .id=this_diff_heap->id,
-      .tag=ts_subtree_symbol(*self_subtree)
-    };
     ChildPrototypeArray child_prototypes = array_new(); // create array to hold the ids of all children
-    for (uint32_t i = 0; i < ts_subtree_child_count(*self_subtree); i++) {
-      Subtree *child = &ts_subtree_children(*self_subtree)[i];
-      const TSDiffHeap *child_diff_heap = ts_subtree_node_diff_heap(*child);
-      array_push(&child_prototypes, (ChildPrototype) {.child_id=child_diff_heap->id});
+    if (pd.needs_action && is_relevant(*self_subtree, lit_map)) {
+      create_missing_detach(*self_subtree, buffer, pd);
     }
-    unload_data.kids = child_prototypes; // add the ChildPrototypeArray to the unload
-    ts_edit_script_buffer_add(buffer,
-                              (SugaredEdit) {
-                                .edit_tag=UNLOAD,
-                                .unload=unload_data
-                              }); // create unload
+    unload_list(*self_subtree, lit_map, &pd, 0, &child_prototypes, lang);
+    if (is_relevant(*self_subtree, lit_map)) {
+      Unload abstract_unload = {
+        .id=this_diff_heap->id,
+        .tag=ts_subtree_symbol(*self_subtree),
+        .kids=child_prototypes
+      };
+      ts_edit_script_buffer_add(buffer,
+                                (SugaredEdit) {
+                                  .edit_tag=UNLOAD,
+                                  .unload=abstract_unload
+                                }); // create unload
+    }
     for (uint32_t i = 0; i < ts_subtree_child_count(*self_subtree); i++) { // recursive call
       Subtree *child = &ts_subtree_children(*self_subtree)[i];
-      unload_unassigned(child, buffer);
+      ParentData child_pd = generate_new_pd(*self_subtree, pd, i, &child_prototypes, lang);
+      unload_unassigned(child, buffer, child_pd, lit_map, lang);
     }
   }
 }
@@ -510,12 +687,13 @@ static void unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer) {
  * @param literal_map Pointer to the literalmap
  * @param self_tree Pointer to the original tree
  * @param subtree_pool Pointer to the SubtreePool
+ * @param pd ParentData of the current subtree
  * @return Constructed Subtree
  */
 static Subtree
 load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLanguage *lang, const char *self_code,
                 const char *other_code,
-                const TSLiteralMap *literal_map, SubtreePool *subtree_pool) {
+                const TSLiteralMap *literal_map, SubtreePool *subtree_pool, ParentData pd) {
   TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
   if (other_diff_heap->assigned != NULL) { // check if assigned
     // Assigned -> No LoadEdit needed -> try to update literals
@@ -523,6 +701,13 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
     update_literals_rec(assigned_subtree, other_subtree, buffer, lang, self_code, other_code,
                         literal_map); // update literals
     ts_subtree_retain(*assigned_subtree); // increment reference counter of the subtree, since we reuse it
+    if (pd.cpa != NULL) {
+      if (is_relevant(*other_subtree, literal_map)) {
+        push_abstract_child_prototype(ts_subtree_node_diff_heap(*assigned_subtree)->id, pd);
+      } else {
+        load_reused(*assigned_subtree, pd, literal_map);
+      }
+    }
     return *assigned_subtree;
   }
   other_diff_heap->share = NULL;
@@ -539,16 +724,23 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
   Load load_data = {
     .id=new_id,
     .tag=ts_subtree_symbol(*other_subtree),
+    .is_leaf=ts_subtree_child_count(*other_subtree) == 0
   };
+  if (pd.cpa != NULL) {
+    if (is_relevant(*other_subtree, literal_map)) {
+      push_abstract_child_prototype(new_id, pd);
+    }
+  }
   if (ts_subtree_child_count(*other_subtree) > 0) { // test for children to decide if it's a node or a leaf
     // -> Node
     SubtreeArray kids = array_new();
     ChildPrototypeArray child_prototypes = array_new();
+    ChildPrototypeArray *child_prototypes_pointer = &child_prototypes;
     for (uint32_t i = 0; i < ts_subtree_child_count(*other_subtree); i++) { // load children
       Subtree *other_kid = &ts_subtree_children(*other_subtree)[i];
-      Subtree kid_subtree = load_unassigned(other_kid, buffer, lang, self_code, other_code, literal_map, subtree_pool);
-      TSDiffHeap *kid_diff_heap = ts_subtree_node_diff_heap(kid_subtree); // get the child's DiffHeap
-      array_push(&child_prototypes, (ChildPrototype) {.child_id=kid_diff_heap->id});
+      ParentData child_pd = generate_new_pd(*other_subtree, pd, i, child_prototypes_pointer, lang);
+      Subtree kid_subtree = load_unassigned(other_kid, buffer, lang, self_code, other_code, literal_map, subtree_pool,
+                                            child_pd);
       array_push(&kids, kid_subtree);
     }
     // Create new node
@@ -563,40 +755,21 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
     ts_subtree_assign_node_diff_heap(&mut_node, new_node_diff_heap); // assign DiffHeap to the new node
     Subtree new_node = ts_subtree_from_mut(mut_node);
     load_data.is_leaf = false;
-    EditNodeData node_data = {.kids=child_prototypes, .production_id=ts_subtree_production_id(*other_subtree)};
-    load_data.node = node_data;
-    // Create LoadEdit
-    ts_edit_script_buffer_add(buffer,
-                              (SugaredEdit) {
-                                .edit_tag=LOAD,
-                                .load=load_data
-                              });
+    load_data.kids = child_prototypes;
+    if (is_relevant(new_node, literal_map)) {
+      ts_edit_script_buffer_add(buffer,
+                                (SugaredEdit) {
+                                  .edit_tag=LOAD,
+                                  .load=load_data
+                                });
+    } else {
+      array_delete(child_prototypes_pointer);
+    }
     return new_node;
   } else {
     // -> Leaf
     load_data.is_leaf = true;
-    EditLeafData leaf_data = {
-      .padding=ts_subtree_padding(*other_subtree),
-      .size=ts_subtree_size(*other_subtree),
-      .lookahead_bytes=ts_subtree_lookahead_bytes(*other_subtree),
-      .parse_state=ts_subtree_parse_state(*other_subtree),
-      .has_external_tokens=ts_subtree_has_external_tokens(*other_subtree),
-      .depends_on_column=ts_subtree_depends_on_column(*other_subtree),
-      .is_keyword=ts_subtree_is_keyword(*other_subtree)
-    };
-    if (ts_subtree_has_external_tokens(*other_subtree)) {
-      const ExternalScannerState *node_state = &other_subtree->ptr->external_scanner_state;
-      leaf_data.external_scanner_state = ts_external_scanner_state_copy(node_state);
-    } else if (ts_subtree_is_error(*other_subtree)) {
-      leaf_data.lookahead_char = other_subtree->ptr->lookahead_char;
-    }
-    load_data.leaf = leaf_data;
-    // Create LoadEdit
-    ts_edit_script_buffer_add(buffer,
-                              (SugaredEdit) {
-                                .edit_tag=LOAD,
-                                .load = load_data
-                              });
+
     // Create new leaf
     Subtree new_leaf;
     if (ts_subtree_is_error(*other_subtree)) { // check for error leaf
@@ -622,6 +795,15 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
     }
     ts_subtree_assign_node_diff_heap(&mut_leaf, new_node_diff_heap); // assign DiffHeap to the new leaf
     new_leaf = ts_subtree_from_mut(mut_leaf);
+    // Create LoadEdit
+    if (is_relevant(new_leaf, literal_map)) {
+      ts_edit_script_buffer_add(buffer,
+                                (SugaredEdit) {
+                                  .edit_tag=LOAD,
+                                  .load=load_data
+                                });
+    }
+
     return new_leaf;
   }
 
@@ -632,11 +814,9 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
  * original tree and newly loaded nodes.
  * @param this_subtree Pointer to a subtree in the original tree
  * @param other_subtree Pointer to a subtree in the changed tree
- * @param parent_id ID of the parent node (or NULL if ROOT)
- * @param parent_type TSSymbol of the parent node (or UINT16_MAX if ROOT)
- * @param link Childindex of the parent node
  * @param buffer Pointer to the EditScriptBuffer
  * @param subtree_pool Pointer to the SubtreePool
+ * @param pd ParentData of the current subtree
  * @param lang Pointer to the used TSLanguage
  * @param self_code Pointer to the original code
  * @param other_code Pointer to the changed code
@@ -644,9 +824,8 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
  * @return Constructed Subtree
  */
 Subtree
-compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, void *parent_id, TSSymbol parent_type, uint32_t link,
-                    EditScriptBuffer *buffer, SubtreePool *subtree_pool, const TSLanguage *lang, const char *self_code,
-                    const char *other_code,
+compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuffer *buffer, SubtreePool *subtree_pool,
+                    ParentData pd, const TSLanguage *lang, const char *self_code, const char *other_code,
                     const TSLiteralMap *literal_map) {
   TSDiffHeap *this_diff_heap = ts_subtree_node_diff_heap(*this_subtree);
   const TSDiffHeap *other_diff_heap = ts_subtree_node_diff_heap(*other_subtree);
@@ -659,42 +838,45 @@ compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, void *parent_
     return *this_subtree;
   } else if (this_diff_heap->assigned == NULL && other_diff_heap->assigned == NULL) {
     // No match -> recurse into
-    Subtree rec_gen_subtree = compute_edit_script_recurse(this_subtree, other_subtree, buffer, subtree_pool, lang,
+    Subtree rec_gen_subtree = compute_edit_script_recurse(this_subtree, other_subtree, buffer, subtree_pool, pd, lang,
                                                           self_code, other_code, literal_map);
     if (rec_gen_subtree.ptr != NULL) {
       return rec_gen_subtree;
     }
   }
   // This subtree does not match with the changed subtree at the same position -> create DetachEdit
-  Detach detach_data = {
-    .id=this_diff_heap->id,
-    .tag=ts_subtree_symbol(*this_subtree),
-    .link=link,
-    .parent_id=parent_id,
-    .parent_tag=parent_type
-  };
-  ts_edit_script_buffer_add(buffer,
-                            (SugaredEdit) {
-                              .edit_tag=DETACH,
-                              .detach=detach_data
-                            });
-  unload_unassigned(this_subtree, buffer);  // unload all unassigned subtrees (in the original tree)
+  if (is_relevant(*this_subtree, literal_map)) {
+    create_missing_detach(*this_subtree, buffer, pd);
+  } else {
+    pd.needs_action = true;
+  }
+  unload_unassigned(this_subtree, buffer, pd, literal_map,
+                    lang);  // unload all unassigned subtrees (in the original tree)
   Subtree new_subtree = load_unassigned(other_subtree, buffer, lang, self_code, other_code, literal_map,
-                                        subtree_pool); // load all unassigned subtrees (in the changed tree)
+                                        subtree_pool, pd); // load all unassigned subtrees (in the changed tree)
   TSDiffHeap *new_subtree_diff_heap = ts_subtree_node_diff_heap(new_subtree);
   // Attach new subtree
-  Attach attach_data = {
-    .id=new_subtree_diff_heap->id,
-    .tag=ts_subtree_symbol(new_subtree),
-    .link=link,
-    .parent_tag=parent_type,
-    .parent_id=parent_id
-  };
-  ts_edit_script_buffer_add(buffer,
-                            (SugaredEdit) {
-                              .edit_tag=ATTACH,
-                              .attach=attach_data
-                            });
+  if (is_relevant(new_subtree, literal_map)) {
+    Attach attach_data = {
+      .id=new_subtree_diff_heap->id,
+      .tag=ts_subtree_symbol(new_subtree),
+      .is_field=pd.is_field,
+      .parent_tag=pd.parent_symbol,
+      .parent_id=pd.parent_id
+    };
+    if (pd.is_field) {
+      attach_data.field_id = pd.field_id;
+    } else {
+      attach_data.link = pd.link;
+    }
+    ts_edit_script_buffer_add(buffer,
+                              (SugaredEdit) {
+                                .edit_tag=ATTACH,
+                                .attach=attach_data
+                              });
+  } else {
+    attach_next_root(new_subtree, *other_subtree, pd, buffer, literal_map);
+  }
   return new_subtree;
 }
 
@@ -720,8 +902,9 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create(); // create new EditScriptBuffer
   SubtreePool subtree_pool = ts_subtree_pool_new(32); // create new SubtreePool
   // STEP 4: Compute EditScript and construct new Subtree
-  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, NULL, UINT16_MAX, 0, &edit_script_buffer,
-                                                 &subtree_pool, this_tree->language, self_code, other_code,
+  ParentData root_data = {.parent_id = NULL, .parent_symbol = UINT16_MAX, .link = 0, .cpa=NULL};
+  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, &edit_script_buffer,
+                                                 &subtree_pool, root_data, this_tree->language, self_code, other_code,
                                                  literal_map);
   EditScript *edit_script = ts_edit_script_buffer_finalize(
     &edit_script_buffer); // Convert EditScriptBuffer to EditScript
@@ -763,8 +946,9 @@ TSDiffResult ts_compare_to_print_graph(const TSTree *this_tree, const TSTree *th
   EditScriptBuffer edit_script_buffer = ts_edit_script_buffer_create(); // create new EditScriptBuffer
   SubtreePool subtree_pool = ts_subtree_pool_new(32); // create new SubtreePool
   // STEP 4: Compute EditScript and construct new Subtree
-  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, NULL, UINT16_MAX, 0, &edit_script_buffer,
-                                                 &subtree_pool, this_tree->language, self_code, other_code,
+  ParentData root_data = {.parent_id = NULL, .parent_symbol = UINT16_MAX, .link = 0, .cpa=NULL};
+  Subtree computed_subtree = compute_edit_script(self_subtree, other_subtree, &edit_script_buffer,
+                                                 &subtree_pool, root_data, this_tree->language, self_code, other_code,
                                                  literal_map);
   EditScript *edit_script = ts_edit_script_buffer_finalize(
     &edit_script_buffer); // Convert EditScriptBuffer to EditScript

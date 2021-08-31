@@ -36,6 +36,19 @@ struct TSDiffHeap {
 };
 
 typedef struct {
+  TSSymbol parent_symbol;
+  void *parent_id;
+  uint16_t production_id;
+  bool is_field;
+  union {
+    TSFieldId field_id;
+    uint32_t link;
+  };
+  ChildPrototypeArray *cpa;
+  bool needs_action;
+} ParentData;
+
+typedef struct {
   Subtree *subtree;
   bool valid;
 } NodeEntry;
@@ -43,11 +56,11 @@ typedef struct {
 typedef Array(NodeEntry) NodeEntryArray;
 
 Subtree
-compute_edit_script_recurse(Subtree *, Subtree *, EditScriptBuffer *, SubtreePool *, const TSLanguage *, const char *,
+compute_edit_script_recurse(Subtree *, Subtree *, EditScriptBuffer *, SubtreePool *, ParentData ,const TSLanguage *, const char *,
                             const char *, const TSLiteralMap *);
 
 Subtree
-compute_edit_script(Subtree *, Subtree *, void *, TSSymbol, uint32_t, EditScriptBuffer *, SubtreePool *,
+compute_edit_script(Subtree *, Subtree *, EditScriptBuffer *, SubtreePool *, ParentData pd,
                     const TSLanguage *, const char *, const char *, const TSLiteralMap *);
 
 uint32_t ts_real_node_child_count(TSNode);

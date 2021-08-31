@@ -931,6 +931,11 @@ TSLiteralMap *ts_literal_map_create(const TSLanguage *);
 void ts_literal_map_add_literal(const TSLiteralMap *, uint16_t);
 
 /**
+ * Marks a specific symbol (represented by its id) as an unnamed token.
+ */
+void ts_literal_map_add_unnamed_token(const TSLiteralMap *, uint16_t);
+
+/**
  * Deletes an TSLiteralMap.
  */
 void ts_literal_map_destroy(TSLiteralMap *);
@@ -955,7 +960,6 @@ void ts_edit_script_delete(EditScript *);
 
 void print_edit_script(const TSLanguage *, const EditScript *);
 
-void print_minimized_edit_script(const TSLanguage *, const EditScript *);
 
 uint32_t ts_edit_script_length(EditScript *);
 

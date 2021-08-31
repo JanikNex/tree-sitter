@@ -4,52 +4,47 @@
 #include "subtree.h"
 
 typedef struct {
-    void *child_id;
+  void *child_id;
+  bool is_field;
+  union {
+    TSFieldId field_id;
+    uint32_t link;
+  };
 } ChildPrototype;
 
 typedef Array(ChildPrototype) ChildPrototypeArray;
 
-typedef struct {
-    Length padding;
-    Length size;
-    uint32_t lookahead_bytes;
-    TSStateId parse_state;
-    bool has_external_tokens: 1;
-    bool depends_on_column: 1;
-    bool is_keyword: 1;
-    union {
-        ExternalScannerState external_scanner_state;
-        int32_t lookahead_char;
-    };
-} EditLeafData;
-
-typedef struct {
-    ChildPrototypeArray kids;
-    uint16_t production_id;
-} EditNodeData;
 
 typedef enum {
-    CORE_ATTACH, CORE_DETACH, CORE_UNLOAD, CORE_LOAD, CORE_UPDATE, CORE_UPDATE_PADDING
+    CORE_ATTACH, CORE_DETACH, CORE_UNLOAD, CORE_LOAD, CORE_UPDATE
 } CoreEditTag;
 
 typedef enum {
-    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE, UPDATE_PADDING
+    ATTACH, DETACH, UNLOAD, LOAD, LOAD_ATTACH, DETACH_UNLOAD, UPDATE
 } EditTag;
 
 typedef struct {
-    void *id;
-    TSSymbol tag;
+  void *id;
+  TSSymbol tag;
+  void *parent_id;
+  TSSymbol parent_tag;
+  bool is_field;
+  union {
+    TSFieldId field_id;
     uint32_t link;
-    void *parent_id;
-    TSSymbol parent_tag;
+  };
 } Attach;
 
 typedef struct {
-    void *id;
-    TSSymbol tag;
+  void *id;
+  TSSymbol tag;
+  void *parent_id;
+  TSSymbol parent_tag;
+  bool is_field;
+  union {
+    TSFieldId field_id;
     uint32_t link;
-    void *parent_id;
-    TSSymbol parent_tag;
+  };
 } Detach;
 
 typedef struct {
@@ -62,10 +57,7 @@ typedef struct {
     bool is_leaf: 1;
     TSSymbol tag;
     void *id;
-    union {
-        EditLeafData leaf;
-        EditNodeData node;
-    };
+    ChildPrototypeArray kids;
 } Load;
 
 typedef struct {
@@ -77,33 +69,31 @@ typedef struct {
     Length new_size;
 } Update;
 
-typedef struct{
-  void *id;
-  TSSymbol tag;
-  Length old_padding;
-  Length new_padding;
-}UpdatePadding;
-
 typedef struct {
-    bool is_leaf: 1;
-    void *id;
+  bool is_leaf: 1;
+  void *id;
+  void *parent_id;
+  TSSymbol parent_tag;
+  TSSymbol tag;
+  ChildPrototypeArray kids;
+  bool is_field;
+  union {
+    TSFieldId field_id;
     uint32_t link;
-    void *parent_id;
-    TSSymbol parent_tag;
-    TSSymbol tag;
-    union {
-        EditLeafData leaf;
-        EditNodeData node;
-    };
+  };
 } LoadAttach;
 
 typedef struct {
-    void *id;
+  void *id;
+  void *parent_id;
+  TSSymbol parent_tag;
+  TSSymbol tag;
+  ChildPrototypeArray kids;
+  bool is_field;
+  union {
+    TSFieldId field_id;
     uint32_t link;
-    void *parent_id;
-    TSSymbol parent_tag;
-    TSSymbol tag;
-    ChildPrototypeArray kids;
+  };
 } DetachUnload;
 
 typedef struct {
@@ -114,7 +104,6 @@ typedef struct {
         Unload unload;
         Load load;
         Update update;
-        UpdatePadding update_padding;
     };
 } CoreEdit;
 
@@ -126,7 +115,6 @@ typedef struct {
         Unload unload;
         Load load;
         Update update;
-        UpdatePadding update_padding;
         LoadAttach load_attach;
         DetachUnload detach_unload;
     };
