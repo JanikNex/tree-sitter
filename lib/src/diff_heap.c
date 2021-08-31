@@ -16,6 +16,13 @@ bool ts_diff_heap_hash_eq(const unsigned char *hash1, const unsigned char *hash2
   return memcmp(hash1, hash2, SHA256_HASH_SIZE) == 0;
 }
 
+/**
+ * Initializes a subtree starting at the current cursor position
+ * @param cursor Pointer to a TSTreeCursor
+ * @param code Pointer to the corresponding source code
+ * @param literal_map Pointer to the TSLiteralMap
+ * @return Pointer to the newly created TSDiffHeap
+ */
 static TSDiffHeap *
 ts_diff_heap_initialize_subtree(TSTreeCursor *cursor, const char *code,
                                 const TSLiteralMap *literal_map) { // TODO: Possible without recursion?
@@ -692,7 +699,7 @@ compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, void *parent_
 }
 
 /**
- * Diffs two TSTrees, computed an EditScript and constructs a new TSTree
+ * Diffs two TSTrees, computes an EditScript and constructs a new TSTree
  * @param this_tree Pointer to the original TSTree
  * @param that_tree Pointer to the changed TSTree
  * @param self_code Pointer to the original code
@@ -733,7 +740,7 @@ ts_compare_to(const TSTree *this_tree, const TSTree *that_tree, const char *self
 }
 
 /**
- * Diffs two TSTrees, computed an EditScript and constructs a new TSTree
+ * Diffs two TSTrees, computes an EditScript and constructs a new TSTree
  * @param this_tree Pointer to the original TSTree
  * @param that_tree Pointer to the changed TSTree
  * @param self_code Pointer to the original code

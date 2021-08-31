@@ -897,7 +897,7 @@ TSSymbolType ts_language_symbol_type(const TSLanguage *, TSSymbol);
 uint32_t ts_language_version(const TSLanguage *);
 
 /**********************/
-/* Section - DiffHeap */
+/* Section - Truediff */
 /**********************/
 
 /**
@@ -907,14 +907,14 @@ uint32_t ts_language_version(const TSLanguage *);
 void ts_diff_heap_initialize(const TSTree *, const char *, const TSLiteralMap *);
 
 /**
- * Compares two hashes
- */
-bool ts_diff_heap_hash_eq(const unsigned char *, const unsigned char *);
-
-/**
  * Deletes all TSNodeDiffHeaps in this tree
  */
 void ts_diff_heap_delete(const TSTree *);
+
+/**
+ * Compares two hashes
+ */
+bool ts_diff_heap_hash_eq(const unsigned char *, const unsigned char *);
 
 /**
  * Creates a new TSLiteralMap.
@@ -958,10 +958,10 @@ void print_edit_script(const TSLanguage *, const EditScript *);
 void print_minimized_edit_script(const TSLanguage *, const EditScript *);
 
 uint32_t ts_edit_script_length(EditScript *);
+
 /**
  * The following TreeCursor functions should be private but are
  * provided to the api for debugging purposes
- *  //TODO: Remove when done
  */
 
 bool ts_diff_tree_cursor_goto_parent(TSTreeCursor *);
