@@ -56,6 +56,7 @@ generate_new_pd(Subtree subtree, ParentData pd, uint32_t idx, ChildPrototypeArra
     &field_map, &field_map_end
   );
   TSFieldId field_id;
+  // Look for the FieldID of the current index
   for (const TSFieldMapEntry *field = field_map; field < field_map_end; field++) {
     if (!field->inherited && field->child_index == idx) {
       is_field = true;
@@ -97,6 +98,12 @@ generate_new_pd(Subtree subtree, ParentData pd, uint32_t idx, ChildPrototypeArra
   }
 }
 
+/**
+ * Push a new abstract child prototype onto a ChildPrototypeArray
+ * @param id ID of the subtree
+ * @param pd Current ParentData
+ * @param cpa Pointer to the ChildPrototypeArray
+ */
 static inline void push_abstract_child_prototype_(void *id, ParentData pd, ChildPrototypeArray *cpa) {
   ChildPrototype acp = {
     .child_id=id,
@@ -114,6 +121,16 @@ static inline void push_abstract_child_prototype(void *id, ParentData pd) {
   push_abstract_child_prototype_(id, pd, pd.cpa);
 }
 
+/**
+ * Unloading an irrelevant node ensures that all subsequent
+ * relevant children are released. Traverse the subtree until you reach these children.
+ * @param sub Current subtree
+ * @param lit_map Pointer to the TSLiteralMap
+ * @param pd Current ParentData
+ * @param cleaned_link Current link
+ * @param child_prototypes Pointer to the ChildPrototypeArray
+ * @param lang Pointer to the TSLanguage
+ */
 static void unload_list(Subtree sub, const TSLiteralMap *lit_map, ParentData *pd, uint32_t cleaned_link,
                         ChildPrototypeArray *child_prototypes, const TSLanguage *lang) {
   for (uint32_t i = 0; i < ts_subtree_child_count(sub); i++) {
@@ -127,6 +144,12 @@ static void unload_list(Subtree sub, const TSLiteralMap *lit_map, ParentData *pd
   }
 }
 
+/**
+ * Creates and inserts a new detach operation
+ * @param sub Current subtree
+ * @param buffer Pointer to the EditScriptBuffer
+ * @param pd Current ParentData
+ */
 static inline void create_missing_detach(Subtree sub, EditScriptBuffer *buffer, ParentData pd) {
   Detach detach_data = {
     .id=ts_subtree_node_diff_heap(sub)->id,
@@ -147,6 +170,12 @@ static inline void create_missing_detach(Subtree sub, EditScriptBuffer *buffer, 
                             });
 }
 
+/**
+ * If a subtree is reused, its relevant children must be added to the child list of the load operation.
+ * @param reused_subtree Current subtree
+ * @param pd Current ParentData
+ * @param lit_map Pointer to the TSLiteralMap
+ */
 static inline void
 load_reused(Subtree reused_subtree, ParentData pd, const TSLiteralMap *lit_map) {
   for (uint32_t i = 0; i < ts_subtree_child_count(reused_subtree); i++) {
@@ -159,12 +188,23 @@ load_reused(Subtree reused_subtree, ParentData pd, const TSLiteralMap *lit_map) 
   }
 }
 
+/**
+ * If an attach should be performed on an irrelevant node, attach operations must be
+ * created for its nearest relevant children instead.
+ * @param sub Current subtree
+ * @param reference Current subtree reference (in the target tree)
+ * @param pd Current ParentData
+ * @param buffer Pointer to the EditScriptBuffer
+ * @param lit_map Pointer to the TSLiteralMap
+ */
 static inline void
 attach_next_root(Subtree sub, Subtree reference, ParentData pd, EditScriptBuffer *buffer, const TSLiteralMap *lit_map) {
   for (uint32_t i = 0; i < ts_subtree_child_count(sub); i++) {
     Subtree child = ts_subtree_children(sub)[i];
     Subtree reference_child = ts_subtree_children(reference)[i];
     if (ts_subtree_node_diff_heap(reference_child)->assigned != NULL) {
+      // If the reference subtree is assigned in the target tree, it was reused due to the
+      // same signature. Therefore no attach is necessary and we can skip it.
       continue;
     }
     if (is_relevant(child, lit_map)) {
@@ -649,12 +689,16 @@ unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer, ParentData pd
   if (this_diff_heap->assigned != NULL) { // check if assigned
     this_diff_heap->assigned = NULL; // reset assignment
     if (pd.needs_action && is_relevant(*self_subtree, lit_map)) {
+      // The parent node was irrelevant, which is why a detach operation to the first relevant parent
+      // node is missing. If the current node is relevant, this detach is inserted.
       create_missing_detach(*self_subtree, buffer, pd);
     }
   } else {
     // create basic unload
     ChildPrototypeArray child_prototypes = array_new(); // create array to hold the ids of all children
     if (pd.needs_action && is_relevant(*self_subtree, lit_map)) {
+      // The parent node was irrelevant, which is why a detach operation to the first relevant parent
+      // node is missing. If the current node is relevant, this detach is inserted.
       create_missing_detach(*self_subtree, buffer, pd);
     }
     unload_list(*self_subtree, lit_map, &pd, 0, &child_prototypes, lang);
@@ -705,6 +749,7 @@ load_unassigned(Subtree *other_subtree, EditScriptBuffer *buffer, const TSLangua
       if (is_relevant(*other_subtree, literal_map)) {
         push_abstract_child_prototype(ts_subtree_node_diff_heap(*assigned_subtree)->id, pd);
       } else {
+        // Since the current subtree is not relevant, we have to create load operations for all subsequent subtrees.
         load_reused(*assigned_subtree, pd, literal_map);
       }
     }
@@ -846,8 +891,11 @@ compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuf
   }
   // This subtree does not match with the changed subtree at the same position -> create DetachEdit
   if (is_relevant(*this_subtree, literal_map)) {
+    // We create a detach operation because the current subtree is relevant
     create_missing_detach(*this_subtree, buffer, pd);
   } else {
+    // Since the current subtree is not relevant, we mark it in the ParentData. As a result, the
+    // following subtrees create a detach operation while it unloads.
     pd.needs_action = true;
   }
   unload_unassigned(this_subtree, buffer, pd, literal_map,
@@ -857,6 +905,7 @@ compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuf
   TSDiffHeap *new_subtree_diff_heap = ts_subtree_node_diff_heap(new_subtree);
   // Attach new subtree
   if (is_relevant(new_subtree, literal_map)) {
+    // Create an attach operation for the current subtree
     Attach attach_data = {
       .id=new_subtree_diff_heap->id,
       .tag=ts_subtree_symbol(new_subtree),
@@ -875,6 +924,7 @@ compute_edit_script(Subtree *this_subtree, Subtree *other_subtree, EditScriptBuf
                                 .attach=attach_data
                               });
   } else {
+    // Since the current subtree is irrelevant, we have to create attach operations for its named children
     attach_next_root(new_subtree, *other_subtree, pd, buffer, literal_map);
   }
   return new_subtree;
