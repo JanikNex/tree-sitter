@@ -171,6 +171,31 @@ static inline void create_missing_detach(Subtree sub, EditScriptBuffer *buffer, 
 }
 
 /**
+ * In case some irrelevant subtree root had been assigned but skipped, we need to push corresponding
+ * detach edits for its following relevant children.
+ * Therefore, recursively traverse the subtrees children until some relevant is found to push
+ * the detach operation.
+ *
+ * @param sub Current subtree
+ * @param lit_map Pointer to the TSLiteralMap
+ * @param pd ParentData of the assigned subtree.
+ * @param buffer Pointer to the EditScriptBuffer
+ */
+static void
+detach_next_children(Subtree sub, const struct TSLiteralMap *lit_map, ParentData pd, EditScriptBuffer *buffer) {
+  if (pd.needs_action && is_relevant(sub, lit_map)) {
+    create_missing_detach(sub, buffer, pd);
+  } else {
+    // recursively traverse children reusing the same ParentData, since we have to create the
+    // missing Detach-Operations with regards to the parent of the irrelevant root.
+    for (uint32_t i = 0; i < ts_subtree_child_count(sub); i++) {
+      Subtree child = ts_subtree_children(sub)[i];
+      detach_next_children(child, lit_map, pd, buffer);
+    }
+  }
+}
+
+/**
  * If a subtree is reused, its relevant children must be added to the child list of the load operation.
  * @param reused_subtree Current subtree
  * @param pd Current ParentData
@@ -692,6 +717,8 @@ unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer, ParentData pd
       // The parent node was irrelevant, which is why a detach operation to the first relevant parent
       // node is missing. If the current node is relevant, this detach is inserted.
       create_missing_detach(*self_subtree, buffer, pd);
+    } else {
+      detach_next_children(*self_subtree, lit_map, pd, buffer);
     }
   } else {
     // create basic unload
