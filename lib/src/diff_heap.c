@@ -717,7 +717,7 @@ unload_unassigned(Subtree *self_subtree, EditScriptBuffer *buffer, ParentData pd
       // The parent node was irrelevant, which is why a detach operation to the first relevant parent
       // node is missing. If the current node is relevant, this detach is inserted.
       create_missing_detach(*self_subtree, buffer, pd);
-    } else {
+    } else if (pd.needs_action) {
       detach_next_children(*self_subtree, lit_map, pd, buffer);
     }
   } else {
